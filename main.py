@@ -1,32 +1,39 @@
 import functools
 import os
+import pprint
 import time
 import warnings
-
-import fasttext
-import t5
-import tensorflow as tf
-import tensorflow_datasets as tfds
-import pprint
-
 # Improve logging.
 from contextlib import contextmanager
 import logging as py_logging
 
-from automatic_metrics import our_bleu, ppl, style_accuracy
-from datasets import raw_to_tsv, raw_to_fasttext_input
-
-from apiclient.http import MediaIoBaseDownload
-from googleapiclient.discovery import build
+import fasttext
+import gin
 import kenlm
+import subprocess
+from mesh_tensorflow.transformer import transformer, utils
+import tensorflow as tf
+import tensorflow_datasets as tfds
+import t5
+import t5.data.sentencepiece_vocabulary as sentencepiece_processor
+from googleapiclient.discovery import build
+import tensorflow_hub as hub
 
-from my_t5_data_utils import TfdsTask_ll, TaskRegistry_ll
+from automatic_metrics.automatic_metrics import our_bleu, perplexity, style_accuracy, sentence_similarity
+from dataset import raw_to_tsv, st_preprocessor, raw_to_fasttext_input
+from eval import print_random_predictions
+from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
+from my_mesh_tensorflow_transformer_utils import build_model_ll, tpu_estimator_model_fn_ll
+from my_t5_data_preprocessors import denoise_ll
+from my_t5_data_utils import TaskRegistry_ll, MixtureRegistry_ll
+from my_utils import download_from_bucket_to_local, upload_blob
+from my_t5_models_mtf_model import MtfModel_ll
 
 
 def test_tpu():
-    TPU_WORKER = "10.240.1.2:8470"
+    tpu_worker = "10.240.1.2:8470"
 
-    with tf.compat.v1.Session('grpc://' + TPU_WORKER) as session:
+    with tf.compat.v1.Session('grpc://' + tpu_worker) as session:
         print('TPU devices:')
         pprint.pprint(session.list_devices())
 
@@ -41,142 +48,26 @@ def tf_verbosity_level(level):
   tf.logging.set_verbosity(og_level)
 
 
-def st_preprocessor(ds):
-    def normalize_text(text):
-        """Lowercase and remove quotes from a TensorFlow string."""
-        text = tf.strings.lower(text)
-        # text = tf.strings.regex_replace(text,"'(.*)'", r"\1")
-        # TODO: add cleaning methods suitable for "dirty" comments. Maybe perspective has it? Or SentencePiece already does it.
-        return text
-
-    def to_inputs_and_targets(ex):
-        """Map {"text": ..., [...], "toxicity": ...}->
-               {"inputs": ..., ["style": ..., "codeprefixedtargets": ...,]
-                "targets": ...}."""
-        if DATASET == "IMDB":
-            style = tf.strings.to_number(ex["style"], tf.int32)
-        elif DATASET == "CCTK":
-            style = tf.dtypes.cast(tf.round(ex["toxicity"]), tf.int32)
-
-        if STYLE_DEPENDANT_PREFIX_INPUT:
-            if tf.math.equal(style, 0):
-                inputs = tf.strings.join(
-                    [INPUT_PREFIX_STYLE_1, normalize_text(ex["text"])])
-            else:
-                inputs = tf.strings.join(
-                    [INPUT_PREFIX_STYLE_2, normalize_text(ex["text"])])
-        else:
-            inputs = tf.strings.join(
-                ["", normalize_text(ex["text"])])
-
-        targets = normalize_text(ex["text"])
-
-        ex_processed = {"inputs": inputs, "targets": targets}
-
-        if STYLE_BIT:
-            ex_processed["style"] = tf.expand_dims(style + 1,
-                                                   0)  # +1 because 0 considered as padding so styles are 1 and 2
-
-        if STYLE_DEPENDANT_PREFIX_TARGET:
-            if tf.math.equal(style, 0):
-                codeprefixedtargets = tf.strings.join(
-                    [TARGET_PREFIX_STYLE_1, normalize_text(ex["text"])])  # For training
-                codeprefix = tf.strings.join([TARGET_PREFIX_STYLE_2, ""])  # For eval, the other code prefix
-            else:
-                codeprefixedtargets = tf.strings.join(
-                    [TARGET_PREFIX_STYLE_2, normalize_text(ex["text"])])  # For training
-                codeprefix = tf.strings.join([TARGET_PREFIX_STYLE_1, ""])  # For eval, the other code prefix
-
-            ex_processed["codeprefixedtargets"] = codeprefixedtargets
-            ex_processed["codeprefix"] = codeprefix
-
-        return ex_processed
-
-    return ds.map(to_inputs_and_targets,
-                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-def denoise_ll(dataset,
-            vocabulary,
-            noise_density=1.0, #0.15
-            noise_mask_fn=t5.data.preprocessors.iid_noise_mask,
-            inputs_fn=t5.data.preprocessors.permute_noise_tokens,  # noise_token_to_random_token_or_sentinel, #  noise_token_to_sentinel,
-            targets_fn=None,
-            **unused_kwargs):
-  """Gin-configurable token preprocessor for self-supervised denoising tasks.
-  This function takes a dataset containing "targets" sequences,
-  and turns each sequence into a dictionary containing:
-  {
-    "inputs": noisy version of the original sequence
-    "targets": the full original sequence or missing parts of original sequence
-  }
-  In particular, for each sequence, we choose a boolean noise_mask identifying
-  which tokens in the sequence to corrupt, as defined by the given
-  noise_mask_fn.
-  Given the sequence and the noise mask, we generate the inputs and targets
-  using the given inputs_fn and targets_fn respectively.
-  The self-supervised tasks vary along these axes:
-    - noise_density: What fraction of the tokens to select as noise
-    - noise_mask_fn: What pattern should the noise mask follow
-        (iid, regular segments, etc.)
-    - inputs_fn: How to apply the noise
-        (drop noise tokens, replace with sentinels, etc.)
-    - targets_fn: How to represent the output
-        (full sequence, only non-noise tokens, etc.)
-  Note: Some functionality has been deleted, which we may or may not want to
-  restore at a later date.  The code for this functionality can be found in
-  the deleted code for this CL.  In particular:
-    - mixture of masking and random replacement
-    - task labels prepended to the inputs
-  Args:
-    dataset: A tf.data.Dataset to process.
-    vocabulary: A mesh_tensorflow.transformer.vocabulary.Vocabulary.
-    noise_density: a float
-    noise_mask_fn: a function from (length, noise_density) -> boolean mask
-    inputs_fn: a function from (tokens, noise_mask, vocabulary) -> tokens
-    targets_fn: a function from (tokens, noise_mask, vocabulary) -> tokens
-  Returns:
-    A preprocessed tf.data.Dataset.
-  """
-  def my_fn(features):
-    tokens = features['targets']
-    noise_mask = noise_mask_fn(tf.size(tokens), noise_density)
-    inputs = inputs_fn(tokens, noise_mask, vocabulary)
-    if targets_fn:
-      targets = targets_fn(tokens, noise_mask, vocabulary)
-    else:
-      targets = tokens
-    ex = {'inputs': inputs, 'targets': targets}
-    if 'inputs_plaintext' in features:
-      ex['inputs_plaintext'] = features['inputs_plaintext']
-    if 'targets_plaintext' in features:
-      ex['targets_plaintext'] = features['targets_plaintext']
-    if STYLE_BIT:
-      ex['style'] = features['style']
-    if STYLE_DEPENDANT_PREFIX_TARGET:
-      ex['codeprefixedtargets'] = features['codeprefixedtargets']
-      ex['codeprefix'] = features['codeprefix']
-    return ex
-  return dataset.map(my_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-
-
-
 def main():
     if ON_CLOUD:
-        if USE_COLAB_TPU:
-            assert "COLAB_TPU_ADDR" in os.environ, "ERROR: Not connected to a TPU runtime; please see the first cell in this notebook for instructions!"
-            TPU_ADDRESS = "grpc://" + os.environ["COLAB_TPU_ADDR"]
+        if USE_TPU:
+            if USE_COLAB_TPU:
+                assert "COLAB_TPU_ADDR" in os.environ, "ERROR: Not connected to a TPU runtime; please see the first cell in this notebook for instructions!"
+                TPU_ADDRESS = "grpc://" + os.environ["COLAB_TPU_ADDR"]
+            else:
+                TPU_ADDRESS = "grpc://" + TPU_WORKER
+
+            TPU_TOPOLOGY = "2x2"
+            print("TPU address is", TPU_ADDRESS)
         else:
-            TPU_ADDRESS = "grpc://" + TPU_WORKER
+            TPU_ADDRESS = None
+            TPU_TOPOLOGY = "2x2"
 
-        TPU_TOPOLOGY = "2x2"
-        print("TPU address is", TPU_ADDRESS)
-
-        # from google.colab import auth
-        # auth.authenticate_user()
-        with tf.Session(TPU_ADDRESS) as session:
-            print('TPU devices:')
-            pprint.pprint(session.list_devices())
+        #from google.colab import auth
+        #auth.authenticate_user()
+        ##with tf.compat.v1.Session(TPU_ADDRESS) as session:
+           ##print('TPU devices:')
+           ##pprint.pprint(session.list_devices())
 
             # Upload credentials to TPU..
             # with open('/content/adc.json', 'r') as f:
@@ -191,42 +82,38 @@ def main():
         tf.get_logger().propagate = False
         py_logging.root.setLevel('INFO')
 
-    # Denoising autoencoder
-    DENOISE = [(t5.data.preprocessors.noise_token_to_random_token_or_sentinel,
-                0.15)]  # [(inputs_fn, noise_density), ...] or None
-
-    NQ_RAW_DIR = "gs://test-t5/imdb_processed"
-
-    imdb_tsv_path = {
-        "train": os.path.join(DATA_DIR, "imdb-train.tsv"),
-        "validation": os.path.join(DATA_DIR, "imdb-validation.tsv")
-    }
-
+    task_cls = []
+    task_kwargs = {}
+    ## Generating and / or loading datasets
     if DATASET == "IMDB":
-      tf.logging.info("Generating IMDB TSVs.")
-      # TODO if not train tsv in bucket...
-      raw_to_tsv(os.path.join(NQ_RAW_DIR, "train.pos"), os.path.join(NQ_RAW_DIR, "train.neg"), imdb_tsv_path["train"])
-      # TODO if not validation tsv in bucket...
-      raw_to_tsv(os.path.join(NQ_RAW_DIR, "dev.pos"), os.path.join(NQ_RAW_DIR, "dev.neg"), imdb_tsv_path["validation"])
+        dataset_tsv_path = {
+            "train": os.path.join(DATA_DIR, "%s-train.tsv" % DATASET.lower()),
+            "validation": os.path.join(DATA_DIR, "%s-validation.tsv" % DATASET.lower())
+        }
 
-    if DATASET == "CCTK":
-        tf.logging.info("Saving CCTK")
-        ds = tfds.load(
-            "civil_comments",
-            data_dir=DATA_DIR,
-            # Download data locally for preprocessing to avoid using GCS space.
-            download_and_prepare_kwargs={"download_dir": "./downloads"})
+        train_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["train"])
+        validation_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["validation"])
 
-        print("A few raw validation examples...")
-        for ex in tfds.as_numpy(ds["validation"].take(5)):
-            print(ex)
+        # Generating tsv datasets
+        if not train_tsv_exists or not validation_tsv_exists:
+            tf.compat.v1.logging.info("Generating T5 TSVs.")
 
-    elif DATASET == "IMDB":
-        def st_imdb_dataset_fn(split, shuffle_files=False):
+            if not train_tsv_exists:
+                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "train.pos"),
+                           os.path.join(DATASET_RAW_DIR, "train.neg"),
+                           dataset_tsv_path["train"])
+            if not validation_tsv_exists:
+                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.pos"),
+                           os.path.join(DATASET_RAW_DIR, "dev.neg"),
+                           dataset_tsv_path["validation"])
+            tf.compat.v1.logging.info("T5 TSVs generated.")
+        # Loading datasets
+        def tsv_to_dataset_fn(split, shuffle_files=False):
+            # We only have one file for each split.
             del shuffle_files
 
-            ds = tf.data.TextLineDataset(imdb_tsv_path[split])
-            # Split each "<question>\t<answer>" example into (question, answer) tuple.
+            # Load lines from the text file as examples.
+            ds = tf.data.TextLineDataset(dataset_tsv_path[split])
             ds = ds.map(
                 functools.partial(tf.io.decode_csv, record_defaults=["", ""],
                                   field_delim="\t", use_quote_delim=False),
@@ -236,119 +123,131 @@ def main():
             return ds
 
         print("A few raw validation examples...")
-        for ex in tfds.as_numpy(st_imdb_dataset_fn("validation").take(5)):
+        for ex in tfds.as_numpy(tsv_to_dataset_fn("validation").take(5)):
             print(ex)
 
+        task_kwargs = {"dataset_fn": tsv_to_dataset_fn}
+        task_cls = []
 
-    # perplexity
+    # TODO CCTK, other datasets
+    # TODO balance_fn
+
+    ### Metrics
+    metric_fns = [our_bleu]
     gcs_service = build('storage', 'v1')
-    imdb_ppl_path = "ppl_imdb.binary"  # TODO Adapt it to other datasets
-    local_imdb_ppl_path = imdb_ppl_path
-    gcs_imdb_ppl_path = os.path.join('ppl_binaries', imdb_ppl_path)
 
-    if not os.path.exists(local_imdb_ppl_path):
-        with open(local_imdb_ppl_path, 'wb') as f:  # TODO if we need to pre-train a KenLM model, do it here
-            request = gcs_service.objects().get_media(bucket="test-t5",
-                                                      object=gcs_imdb_ppl_path)
-            media = MediaIoBaseDownload(f, request)
+    ## Perplexity
+    pretrained_ppl_filename = '%s_%s.binary' % ("ppl", DATASET.lower())
+    pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
+    pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
+    print(os.path.join(BASE_DIR,pretrained_ppl_gcs_path))
+    print(tf.io.gfile.exists(os.path.join(BASE_DIR,pretrained_ppl_gcs_path)))
 
-            done = False
-            while not done:
-                # _ is a placeholder for a progress object that we ignore.
-                # (Our file is small, so we skip reporting progress.)
-                status, done = media.next_chunk()
-                print(status)
+    if os.path.exists(pretrained_ppl_local_path) or tf.io.gfile.exists(os.path.join(BASE_DIR, pretrained_ppl_gcs_path)):
+        if not os.path.exists(pretrained_ppl_local_path):  # Pre-trained ppl model fond in GCS
+            tf.compat.v1.logging.info("Downloading pre-trained perplexity model from GCS...")
+            download_from_bucket_to_local(gcs_service, BUCKET, pretrained_ppl_gcs_path, pretrained_ppl_local_path)
+            tf.compat.v1.logging.info('Download %s complete' % pretrained_ppl_filename)
 
-        print('Download ppl_imd.binary complete')
+        pretrained_ppl_model = kenlm.Model(pretrained_ppl_local_path)
+        metric_fns.append(functools.partial(perplexity, ppl_model=pretrained_ppl_model))
+    else:  # Train and upload ppl model
+        tf.compat.v1.logging.warn(
+            "Pre-trained perplexity model not found neither on local nor on bucket."
+            "If you want a perplexity metric, please pre-train a perplexity language model with KenLM."
+            "Instructions here: https://kheafield.com/code/kenlm/"
+        )
 
-    imdb_ppl_model = kenlm.Model(imdb_ppl_path)
+    ## Accuracy
+    pretrained_acc_filename = '%s_%s.bin' % ("acc", DATASET.lower())
+    pretrained_acc_local_path = os.path.join('acc_binaries', pretrained_acc_filename)
+    pretrained_acc_gcs_path = os.path.join('acc_binaries', pretrained_acc_filename)
 
-    # Metric: style accuracy
-    imdb_fasttext_input_path = {
-        "train": os.path.join(DATA_DIR, "imdb_fasttext_input.train"),
-        "validation": os.path.join(DATA_DIR, "imdb_fasttext_input.valid")
-    }
+    if not os.path.exists(pretrained_acc_local_path):
+        if tf.io.gfile.exists(os.path.join(BASE_DIR, pretrained_acc_gcs_path)):
+            tf.compat.v1.logging.info("Downloading pre-trained accuracy model from GCS...")
+            download_from_bucket_to_local(gcs_service, BUCKET, pretrained_acc_gcs_path, pretrained_acc_local_path)
+            tf.compat.v1.logging.info('Download %s complete' % pretrained_acc_filename)
 
-    imdb_acc_path = "acc_imdb.bin"  # TODO Adapt it to other datasets
-    local_imdb_acc_path = imdb_acc_path
-    gcs_imdb_acc_path = os.path.join('acc_binaries', imdb_acc_path)
-
-    if not os.path.exists(local_imdb_acc_path):
-        try:
-            with open(local_imdb_acc_path, 'wb') as f:
-                request = gcs_service.objects().get_media(bucket="test-t5",
-                                                          object=gcs_imdb_acc_path)
-                media = MediaIoBaseDownload(f, request)
-
-                done = False
-                while not done:
-                    # _ is a placeholder for a progress object that we ignore.
-                    # (Our file is small, so we skip reporting progress.)
-                    status, done = media.next_chunk()
-                    print(status)
-
-            print('Download acc_imdb.binary complete')
-        except:  # TODO specify error...
-            tf.logging.info(
+        else:
+            tf.compat.v1.logging.info(
                 "Pre-trained fasttext binary not found on bucket, we will pre-train a fasttext style classifier")
-            tf.logging.info("Generating IMDB fasttext inputs.")
-            raw_to_fasttext_input(os.path.join(NQ_RAW_DIR, "train.pos"), os.path.join(NQ_RAW_DIR, "train.neg"),
-                                  imdb_fasttext_input_path["train"])
-            raw_to_fasttext_input(os.path.join(NQ_RAW_DIR, "dev.pos"), os.path.join(NQ_RAW_DIR, "dev.neg"),
-                                  imdb_fasttext_input_path["validation"])
 
-            imdb_fasttext_input_local_path = {
-                "train": "imdb_fasttext_input.train",
-                "validation": "imdb_fasttext_input.valid"
-            }
+            # TODO Adapt to CCTK because "train.pos" et "train.neg" n'existent pas dans CCTK
+            if DATASET == "IMDB":
+                fasttext_input_gcs_path = {
+                    "train": os.path.join(DATA_DIR, "%s_fasttext_input.train" % DATASET.lower()),
+                    "validation": os.path.join(DATA_DIR, "%s_fasttext_input.valid" % DATASET.lower())
+                }
 
-            if not os.path.exists(imdb_fasttext_input_local_path["train"]):
-                with open(imdb_fasttext_input_local_path["train"], 'wb') as f:
-                    request = gcs_service.objects().get_media(bucket="test-t5",
-                                                              object=os.path.join(DATA_DIR_NAME,
-                                                                                  "imdb_fasttext_input.train"))
-                    media = MediaIoBaseDownload(f, request)
+                fasttext_data_local_path = os.path.join("fasttext_files", DATASET.lower())
+                fasttext_input_local_path = {
+                    "train": os.path.join(fasttext_data_local_path, "%s_fasttext_input.train" % DATASET.lower()),
+                    "validation": os.path.join(fasttext_data_local_path, "%s_fasttext_input.valid" % DATASET.lower())
+                }
 
-                    done = False
-                    while not done:
-                        # _ is a placeholder for a progress object that we ignore.
-                        # (Our file is small, so we skip reporting progress.)
-                        status, done = media.next_chunk()
-                        print(status)
+                train_fasttext_input_exists_on_bucket = tf.io.gfile.exists(os.path.join(BASE_DIR,
+                                                                                        fasttext_input_gcs_path["train"]))
+                validation_fasttext_input_exists_on_bucket = tf.io.gfile.exists(os.path.join(BASE_DIR,
+                                                                                             fasttext_input_gcs_path["validation"]))
 
-                print('Download IMDB fasttext train inputs complete')
+                if not train_fasttext_input_exists_on_bucket or not validation_fasttext_input_exists_on_bucket:
+                    tf.compat.v1.logging.info("Generating fasttext inputs on bucket...")
 
-            if not os.path.exists(imdb_fasttext_input_local_path["validation"]):
-                with open(imdb_fasttext_input_local_path["validation"], 'wb') as f:
-                    request = gcs_service.objects().get_media(bucket="test-t5",
-                                                              object=os.path.join(DATA_DIR_NAME,
-                                                                                  "imdb_fasttext_input.valid"))
-                    media = MediaIoBaseDownload(f, request)
+                    if not train_fasttext_input_exists_on_bucket:
+                        raw_to_fasttext_input(os.path.join(DATASET_RAW_DIR, "train.pos"),
+                                              os.path.join(DATASET_RAW_DIR, "train.neg"),
+                                              fasttext_input_gcs_path["train"])
+                    if not validation_fasttext_input_exists_on_bucket:
+                        raw_to_fasttext_input(os.path.join(DATASET_RAW_DIR, "dev.pos"),
+                                              os.path.join(DATASET_RAW_DIR, "dev.neg"),
+                                              fasttext_input_gcs_path["validation"])
+                    tf.compat.v1.logging.info("Fasttext inputs generated on bucket.")
 
-                    done = False
-                    while not done:
-                        # _ is a placeholder for a progress object that we ignore.
-                        # (Our file is small, so we skip reporting progress.)
-                        status, done = media.next_chunk()
-                        print(status)
+                train_fasttext_input_exists_on_local = os.path.exists(fasttext_input_local_path["train"])
+                validation_fasttext_input_exists_on_local = os.path.exists(fasttext_input_local_path["validation"])
+                if not train_fasttext_input_exists_on_local:
+                    tf.compat.v1.logging.info("Downloading fasttext train input from GCS...")
+                    download_from_bucket_to_local(gcs_service, BUCKET,
+                                                  fasttext_input_gcs_path["train"],
+                                                  fasttext_input_local_path["train"])
+                    tf.compat.v1.logging.info('Download %s complete' % "fasttext_input.train")
 
-                print('Download IMDB fasttext validation inputs complete')
+                if not validation_fasttext_input_exists_on_local:
+                    tf.compat.v1.logging.info("Downloading fasttext validation input from GCS...")
+                    download_from_bucket_to_local(gcs_service, BUCKET,
+                                                  fasttext_input_gcs_path["train"],
+                                                  fasttext_input_local_path["validation"])
+                    tf.compat.v1.logging.info('Download %s complete' % "fasttext_input.valid")
 
+                fasttext_shuffled_input_local_path = os.path.join(fasttext_data_local_path,
+                                                                  "%s_fasttext_shuffled_input.train" % DATASET.lower())
+                if not os.path.exists(fasttext_shuffled_input_local_path):
+                    subprocess.call('cat "%s" | shuf > "%s"' % (fasttext_input_local_path["train"],
+                                                                fasttext_shuffled_input_local_path))
+                tf.compat.v1.logging.info('Training fasttext...')
+                model = fasttext.train_supervised(input=fasttext_shuffled_input_local_path, lr=1.0, epoch=25,
+                                                  wordNgrams=2, bucket=200000, dim=50, loss='hs')
+                tf.compat.v1.logging.info('Done with fasttext training.')
+                model.test_label(fasttext_input_local_path["validation"], k=1)
+                model.save_model(pretrained_acc_local_path)
 
-            !cat
-            "imdb_fasttext_input.train" | shuf > "imdb_fasttext_shuffled_input.train"
+                tf.compat.v1.logging.info('Uploading the pre-trained fasttext model to the bucket...')
+                upload_blob(BUCKET, pretrained_acc_local_path, pretrained_acc_gcs_path)
+                tf.compat.v1.logging.info('Done with uploading the pre-trained fasttext model %s to the bucket.'
+                                % pretrained_acc_filename)
 
-            model = fasttext.train_supervised(input="imdb_fasttext_shuffled_input.train", lr=1.0, epoch=25,
-                                              wordNgrams=2, bucket=200000, dim=50, loss='hs')
-            model.test_label(imdb_fasttext_input_local_path["validation"], k=1)
-            model.save_model("acc_imdb.bin")
+    pretrained_acc_model = fasttext.load_model(pretrained_acc_local_path)
+    metric_fns.append(functools.partial(style_accuracy, classifier_model=pretrained_acc_model))
 
-    classifier_imdb = fasttext.load_model(imdb_acc_path)
+    ## Similarity
+    module_url = "https://tfhub.dev/google/universal-sentence-encoder/2"
+    pretrained_sentence_similarity_model = hub.Module(module_url)
+    metric_fns.append(functools.partial(sentence_similarity,
+                                        sentence_similarity_model=pretrained_sentence_similarity_model))
 
-    print(classifier_imdb.predict(["The acting is awesome"]))
 
     output_features = ["inputs", "targets"]
-
     if STYLE_BIT:
         output_features.append("style")
 
@@ -356,37 +255,35 @@ def main():
         output_features.append("codeprefixedtargets")
         output_features.append("codeprefix")
 
+    text_preprocessor = functools.partial(st_preprocessor, dataset=DATASET, style_bit=STYLE_BIT,
+                    style_dependant_prefix_input=STYLE_DEPENDANT_PREFIX_INPUT,
+                    input_prefix_style_1=INPUT_PREFIX_STYLE_1, input_prefix_style_2=INPUT_PREFIX_STYLE_2,
+                    style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
+                    target_prefix_style_1=TARGET_PREFIX_STYLE_1, target_prefix_style_2=TARGET_PREFIX_STYLE_2)
+
     if DENOISE:
         token_preprocessor = []
         for inputs_fn, noise_density in DENOISE:
-            token_preprocessor.append(functools.partial(denoise_ll, noise_density=0.15,
+            token_preprocessor.append(functools.partial(denoise_ll, noise_density=noise_density,
                                                         noise_mask_fn=t5.data.preprocessors.iid_noise_mask,
-                                                        inputs_fn=t5.data.preprocessors.noise_token_to_random_token_or_sentinel,
+                                                        inputs_fn=inputs_fn,
                                                         targets_fn=None))
     else:
         token_preprocessor = None
 
-    if DATASET == "CCTK":
-        task_kwargs = {"tfds_name": "civil_comments:0.9.0", "tfds_data_dir": DATA_DIR}
-        task_cls = [TfdsTask_ll]
-    elif DATASET == "IMDB":
-        task_kwargs = {"dataset_fn": st_imdb_dataset_fn}
-        task_cls = []
+    # TODO CCTK task parameters
 
     TaskRegistry_ll.add(
         TASK_NAME,
-        # Supply a function which returns a tf.data.Dataset.
         *task_cls,
         splits=["train", "validation"],
         # Supply a function which preprocesses text from the tf.data.Dataset.
-        text_preprocessor=[st_preprocessor],
+        text_preprocessor=[text_preprocessor],
         # Use the same vocabulary that we used for pre-training.
         sentencepiece_model_path=t5.data.DEFAULT_SPM_PATH,
         # Lowercase targets before computing metrics.
         postprocess_fn=t5.data.postprocessors.lower_text,
-        # We'll use accuracy as our evaluation metric.
-        metric_fns=[our_bleu, functools.partial(ppl, imdb_ppl_model=imdb_ppl_model),
-                    functools.partial(style_accuracy, classifier_imdb=classifier_imdb)],
+        metric_fns=metric_fns,
         # Not required, but helps for mixing and auto-caching.
         # num_input_examples=num_nq_examples
         token_preprocessor=token_preprocessor,
@@ -394,11 +291,256 @@ def main():
         **task_kwargs
     )
 
+    # Load and print a few examples.
+    st_task = TaskRegistry_ll.get(TASK_NAME)
+    sequence_length = {"inputs": 128, "targets": 128}
+    if STYLE_BIT:
+        sequence_length["style"] = 128  # Or "style": 1 but packing not efficient...
+    if STYLE_DEPENDANT_PREFIX_TARGET:
+        sequence_length["codeprefixedtargets"] = 128
+        sequence_length["codeprefix"] = 128
+
+    ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
+
+    print("A few preprocessed validation examples...")
+    for ex in tfds.as_numpy(ds.take(3)):
+        print(ex)
+
+    MixtureRegistry_ll.add(
+        MIXTURE_NAME,
+        [TASK_NAME],
+        default_rate=1.0
+    )
+
+
+    # TODO Unittests about preprocessing dataset
+
+    # Modified T5 "style-aware denoising autoencoder (pre-trained) bi-transformer"
+    utils.build_model = functools.partial(build_model_ll ,
+                                          style_embedding_encoder=STYLE_EMBEDDING_ENCODER,
+                                          style_embedding_decoder=STYLE_EMBEDDING_DECODER,
+                                          style_num=STYLE_NUM,
+                                          cut_cross_attention=CUT_CROSS_ATTENTION)
+
+    transformer.make_bitransformer_ll = make_bitransformer_ll
+
+    transformer.Unitransformer_ll = Unitransformer_ll
+
+    utils.tpu_estimator_model_fn = functools.partial(tpu_estimator_model_fn_ll,
+                                                     has_partial_sequences=HAS_PARTIAL_SEQUENCES,
+                                                     remove_partial_sequences=REMOVE_PARTIAL_SEQUENCES,
+                                                     style_embedding=STYLE_EMBEDDING,
+                                                     style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
+                                                     cycle_consistency_loss=CYCLE_CONSISTENCY_LOSS,
+                                                     lambda_ae=LAMBDA_AE,
+                                                     lambda_cycle=LAMBDA_CYCLE)
+
+    if ON_CLOUD and MODEL_SIZE == "3B":
+        tf.compat.v1.logging.warn(
+            "The `3B` model is too large to use with the 5GB GCS free tier. "
+            "Make sure you have at least 25GB on GCS before continuing."
+        )
+    elif ON_CLOUD and MODEL_SIZE == "11B":
+        raise ValueError(
+            "The `11B` parameter is too large to fine-tune on the `v2-8` TPU "
+            "provided by Colab. Please comment out this Error if you're running "
+            "on a larger TPU."
+        )
+
+    # Set parallelism and batch size to fit on v2-8 TPU (if possible).
+    # Limit number of checkpoints to fit within 5GB (if possible).
+    model_parallelism, train_batch_size, keep_checkpoint_max = {
+        "small": (1, 256, 16),
+        "base": (2, 128, 8),
+        "large": (8, 64, 4),
+        "3B": (8, 16, 1),
+        "11B": (8, 16, 1)}[MODEL_SIZE]
+
+    tf.io.gfile.makedirs(MODEL_DIR)
+
+    sequence_length = {"inputs": 128, "targets": 128}
+    if STYLE_BIT:
+        sequence_length["style"] = 128
+    if STYLE_DEPENDANT_PREFIX_TARGET:
+        sequence_length["codeprefixedtargets"] = 128
+        sequence_length["codeprefix"] = 128
+
+    # Ou alors, based on L. 357-362  https://github.com/tensorflow/mesh/blob/a719398c92a48990921e57608ef99553ad1b1a85/mesh_tensorflow/transformer/utils.py#L357
+    # ignore et appeler le feature style "input_style" (dans ce cas length of style = 128)
+
+    my_tokenizer = sentencepiece_processor.SentencePieceVocabulary(t5.data.DEFAULT_SPM_PATH)
+    left_pad_amt_1 = len(my_tokenizer.encode(TARGET_PREFIX_STYLE_1)) - 1
+    left_pad_amt_2 = len(my_tokenizer.encode(TARGET_PREFIX_STYLE_2)) - 1
+
+    model = MtfModel_ll(
+        model_dir=MODEL_DIR,
+        tpu=TPU_ADDRESS,
+        tpu_topology=TPU_TOPOLOGY,
+        model_parallelism=model_parallelism,
+        batch_size=train_batch_size,
+        sequence_length=sequence_length,
+        learning_rate_schedule=0.003,
+        save_checkpoints_steps=5000,
+        keep_checkpoint_max=keep_checkpoint_max if ON_CLOUD else None,
+        iterations_per_loop=100,
+        model_type="bitransformer_ll",
+        style_bit=STYLE_BIT,
+        unsupervised_style_transfer_metrics=UNSUPERVISED_STYLE_TRANSFER_METRICS,
+        style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
+        style_embedding=STYLE_EMBEDDING,
+        shift_decoder_output=SHIFT_DECODER_OUTPUT,
+        left_pad_amt_1=left_pad_amt_1,
+        left_pad_amt_2=left_pad_amt_2
+    )
+
+    with gin.unlock_config():
+        gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
+
+    FINETUNE_STEPS = 2000
+
+    model.finetune(
+        mixture_or_task_name=MIXTURE_NAME,
+        pretrained_model_dir=PRETRAINED_DIR,
+        finetune_steps=FINETUNE_STEPS
+    )
+
+    if EVAL:
+        # Use a larger batch size for evaluation, which requires less memory.
+        model.batch_size = train_batch_size * 4
+        model.eval(
+            mixture_or_task_name=MIXTURE_NAME,
+            checkpoint_steps="all"
+        )
+
+        print_random_predictions(TASK_NAME, sequence_length, MODEL_DIR, n=10)
+
+    # evaluate on made-up comments
+    comment_style_pairs = [
+
+        {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
+         "Destination style": "Positive"},
+        {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
+         "Destination style": "Negative"},
+
+        {"text": "this humor is not funny , and is actually too gay for it 's own good .",
+         "Destination style": "Positive"},
+        {"text": "this humor is not funny , and is actually too gay for it 's own good .",
+         "Destination style": "Negative"},
+
+        {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
+         "Destination style": "Positive"},
+        {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
+         "Destination style": "Negative"},
+
+        {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
+         "Destination style": "Positive"},
+        {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
+         "Destination style": "Negative"},
+
+        {
+            "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
+            "Destination style": "Positive"},
+        {
+            "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
+            "Destination style": "Negative"},
+
+        {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
+         "Destination style": "Positive"},
+        {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
+         "Destination style": "Negative"},
+
+        {"text": "Very bad movie !",
+         "Destination style": "Positive"},
+        {"text": "Very bad movie !",
+         "Destination style": "Negative"},
+
+        {"text": "do not buy this movie .",
+         "Destination style": "Positive"},
+        {"text": "do not buy this movie .",
+         "Destination style": "Negative"},
+
+        {"text": "do buy this movie .",
+         "Destination style": "Negative"},
+        {"text": "do buy this movie .",
+         "Destination style": "Positive"},
+
+        {"text": "Very good movie !",
+         "Destination style": "Negative"},
+        {"text": "Very good movie !",
+         "Destination style": "Positive"},
+
+        {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
+         "Destination style": "Negative"},
+        {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
+         "Destination style": "Positive"},
+
+        {"text": "a comedy that will warm your heart .",
+         "Destination style": "Negative"},
+        {"text": "a comedy that will warm your heart .",
+         "Destination style": "Positive"},
+
+        {"text": "this may seem odd , but i highly recommend it .",
+         "Destination style": "Negative"},
+        {"text": "this may seem odd , but i highly recommend it .",
+         "Destination style": "Positive"},
+
+        {"text": "scott bakula is wonderful in the part of the senior investigator .",
+         "Destination style": "Negative"},
+        {"text": "scott bakula is wonderful in the part of the senior investigator .",
+         "Destination style": "Positive"},
+
+        {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
+         "Destination style": "Negative"},
+        {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
+         "Destination style": "Positive"},
+
+        {"text": "i give this movie 8 stars out of 10 .",
+         "Destination style": "Negative"},
+        {"text": "i give this movie 8 stars out of 10 .",
+         "Destination style": "Positive"}
+    ]
+
+    comments = []
+    for p in comment_style_pairs:
+        comments.append(p["text"] + "|dst_style:" + STYLE_IDS[p["Destination style"]])
+
+    now = time.time()
+    # Write out the supplied questions to text files.
+    predict_inputs_path = os.path.join(MODEL_DIR, "predict_inputs_%d.txt" % now)
+    predict_outputs_path = os.path.join(MODEL_DIR, "predict_outputs_%d.txt" % now)
+    # Manually apply preprocessing
+    with tf.io.gfile.GFile(predict_inputs_path, "w") as f:
+        for c in comments:
+            f.write("%s\n" % c.lower())
+
+    # Ignore any logging so that we only see the model's answers to the questions.
+    with tf_verbosity_level('ERROR'):
+        model.batch_size = len(comments)
+        model.predict(
+            input_file=predict_inputs_path,
+            output_file=predict_outputs_path,
+            # Select the most probable output token at each step.
+            temperature=0,
+        )
+
+    # The output filename will have the checkpoint appended so we glob to get
+    # the latest.
+    prediction_files = sorted(tf.io.gfile.glob(predict_outputs_path + "*"))
+    print("\nPredictions using checkpoint %s:\n" % prediction_files[-1].split("-")[-1])
+    with tf.io.gfile.GFile(prediction_files[-1]) as f:
+        for c, g in zip(comments, f):
+            if c:
+                print("Initial text: " + c.split("|dst_style:")[0])
+                print("Generated text: " + g)
+                print()
+
+
 if __name__ == "__main__":
-    tf.disable_v2_behavior()
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.disable_v2_behavior()
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     # app.run(main)
 
+    # TODO parser
     ## Experience global variables
     # Setup gin interactive mode
     ENTER_GIN_INTERACTIVE_MODE = True
@@ -426,7 +568,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "IMDB"  # CCTK or IMDB
-    counter = 124
+    counter = 140
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -436,6 +578,7 @@ if __name__ == "__main__":
         TARGET_PREFIX_STYLE_1 = "Negative: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
         TARGET_PREFIX_STYLE_2 = "Positive: "  # "Positive: " "Style 2: " imunitar
         STYLE_IDS = {"Negative": "1", "Positive": "2"}
+        DATASET_RAW_DIR = "gs://test-t5/imdb_processed"
 
     else:
         TASK_NAME = "st_toxic_comments"
@@ -450,6 +593,8 @@ if __name__ == "__main__":
         BALANCE_STYLES = True
         BALANCE_RATE = 0.0736  # = 08% / (1 - 08%)
 
+        DATASET_RAW_DIR = None
+
     # Make same-style batches and alternate batches of each style
     GROUP_BY_STYLE = True
 
@@ -458,6 +603,11 @@ if __name__ == "__main__":
 
     # SummAE-like Encoder-Decoder
     CUT_CROSS_ATTENTION = True
+
+    # Cycle-Consistency loss
+    CYCLE_CONSISTENCY_LOSS = True
+    LAMBDA_AE = 1.0
+    LAMBDA_CYCLE = 1.0
 
     # Unit testing
     RUN_UNITTESTS = False
@@ -471,9 +621,22 @@ if __name__ == "__main__":
     UNSUPERVISED_STYLE_TRANSFER_METRICS = True
 
     # GCS setting
+    BUCKET = "test-t5"
     BASE_DIR = "gs://test-t5/"  # @param { type: "string" }
     DATA_DIR = os.path.join(BASE_DIR, DATA_DIR_NAME)
     MODELS_DIR = os.path.join(BASE_DIR, MODELS_DIR_NAME)
     ON_CLOUD = True
     USE_COLAB_TPU = False
+
+    MODEL_SIZE = "small"  # ["small", "base", "large", "3B", "11B"]
+    # Public GCS path for T5 pre-trained model checkpoints
+    BASE_PRETRAINED_DIR = "gs://t5-data/pretrained_models"
+    PRETRAINED_DIR = os.path.join(BASE_PRETRAINED_DIR, MODEL_SIZE)
+    MODEL_DIR = os.path.join(MODELS_DIR, MODEL_SIZE)
+
+    USE_TPU = True
+
+    DENOISE = [(t5.data.preprocessors.noise_token_to_random_token_or_sentinel,
+                0.15)]  # [(inputs_fn, noise_density), ...] or None
+
     main()
