@@ -22,7 +22,7 @@ def ensure_dataset_eos_ll(dataset, feature_keys=None):
       num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
 
-def shift_decoder_output(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature_keys=None):
+def shift_decoder_output_fn(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature_keys=None):
   def _shift_decoder_output(k, t, left_pad_amt):
     if k != "targets":
       return t
@@ -60,7 +60,7 @@ def pack_or_pad_ll(dataset, length, pack=True, feature_keys=None, ensure_eos=Fal
   """
   feature_keys = feature_keys or list(dataset.output_shapes.keys())
   if shift_decoder_output:
-    dataset = shift_decoder_output(dataset, left_pad_amt_1=left_pad_amt_1, left_pad_amt_2=left_pad_amt_2,
+    dataset = shift_decoder_output_fn(dataset, left_pad_amt_1=left_pad_amt_1, left_pad_amt_2=left_pad_amt_2,
                                    feature_keys=feature_keys)
   if pack:
     dataset = pack_dataset(dataset, length=length, keys=feature_keys)
