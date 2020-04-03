@@ -31,7 +31,7 @@ from my_t5_data_utils import TaskRegistry_ll, MixtureRegistry_ll, TfdsTask_ll
 from my_utils import download_from_bucket_to_local, upload_blob
 from my_t5_models_mtf_model import MtfModel_ll
 
-# hello
+
 def test_tpu():
     tpu_worker = "10.240.1.2:8470"
 
