@@ -44,10 +44,10 @@ def test_tpu():
 
 @contextmanager
 def tf_verbosity_level(level):
-  og_level = tf.logging.get_verbosity()
-  tf.logging.set_verbosity(level)
+  og_level = tf.compat.v1.logging.get_verbosity()
+  tf.compat.v1.logging.get_verbosity(level)
   yield
-  tf.logging.set_verbosity(og_level)
+  tf.compat.v1.logging.get_verbosity(og_level)
 
 
 def main():
@@ -404,13 +404,15 @@ def main():
         style_embedding=STYLE_EMBEDDING,
         shift_decoder_output=SHIFT_DECODER_OUTPUT,
         left_pad_amt_1=left_pad_amt_1,
-        left_pad_amt_2=left_pad_amt_2
+        left_pad_amt_2=left_pad_amt_2,
+        target_prefix_style_1=TARGET_PREFIX_STYLE_1,
+        target_prefix_style_2=TARGET_PREFIX_STYLE_2
     )
 
     with gin.unlock_config():
         gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
 
-    FINETUNE_STEPS = 2000
+    FINETUNE_STEPS = 500
 
     model.finetune(
         mixture_or_task_name=MIXTURE_NAME,

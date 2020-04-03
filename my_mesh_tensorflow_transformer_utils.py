@@ -1,5 +1,6 @@
 import os
 
+import functools
 import gin
 import re
 import six
@@ -16,8 +17,9 @@ from mesh_tensorflow.transformer import transformer
 from mesh_tensorflow.transformer import dataset as transformer_dataset
 from mesh_tensorflow.transformer.utils import _dynamic_text2self, get_variable_dtype, serialize_num_microbatches, \
     write_lines_to_file, get_checkpoint_iterator, \
-    get_step_from_checkpoint_path, decode, get_inputs_from_file, encode_inputs
+    get_step_from_checkpoint_path, decode, get_inputs_from_file, encode_inputs, decode_from_file
 
+from dataset import process_style
 from my_mesh_tensorflow_transformer_transformer import Bitransformer_ll, make_bitransformer_ll
 
 
@@ -819,65 +821,103 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                 len(decodes), expected_pad))
 
 @gin.configurable
+@gin.configurable
 def decode_from_file_ll(estimator,
-                     vocabulary,
-                     model_type,
-                     batch_size,
-                     sequence_length,
-                     checkpoint_path=None,
-                     input_filename=gin.REQUIRED,
-                     output_filename=gin.REQUIRED,
-                     eos_id=1,
-                     repeats=1):
-  """Decode from a text file and write to output_filename.
-  Args:
-    estimator: a TPUEstimator
-    vocabulary: a mtf.transformer.vocabulary.Vocabulary
-    model_type: a string
-    batch_size: an integer
-    sequence_length: an integer or a dict from feature-key to integer
-      the (packed) sequence length, e.g. {"inputs": 512, "targets": 128}
-    checkpoint_path: an optional string
-    input_filename: a string
-    output_filename: a string
-    eos_id: EOS id
-    repeats: an integer, the number of times to repeat each input.
-  """
-  inputs = get_inputs_from_file(input_filename)
+                        vocabulary,
+                        model_type,
+                        batch_size,
+                        sequence_length,
+                        checkpoint_path=None,
+                        input_filename=gin.REQUIRED,
+                        output_filename=gin.REQUIRED,
+                        eos_id=1,
+                        repeats=1,
+                        target_prefix_style_1="",
+                        target_prefix_style_2="",
+                        style_dependant_prefix_target=False,
+                        style_embedding=False):
+    """Decode from a text file and write to output_filename.
+    Args:
+      estimator: a TPUEstimator
+      vocabulary: a mtf.transformer.vocabulary.Vocabulary
+      model_type: a string
+      batch_size: an integer
+      sequence_length: an integer or a dict from feature-key to integer
+        the (packed) sequence length, e.g. {"inputs": 512, "targets": 128}
+      checkpoint_path: an optional string
+      input_filename: a string
+      output_filename: a string
+      eos_id: EOS id
+      repeats: an integer, the number of times to repeat each input.
+    """
+    inputs_and_dst_styles = get_inputs_from_file(input_filename)
 
-  all_input_ids = encode_inputs(inputs, vocabulary, model_type, batch_size,
-                                sequence_length["inputs"], eos_id=eos_id)
-  def input_fn(params):
-    del params
-    dataset = tf.data.Dataset.from_tensor_slices({"inputs": all_input_ids})
-    dataset = dataset.flat_map(
-        lambda x: tf.data.Dataset.from_tensors(x).repeat(repeats))
-    dataset = dataset.batch(batch_size, drop_remainder=True)
-    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
-    return dataset
+    inputs_split = [line.split("|dst_style:") for line in inputs_and_dst_styles]
 
-  checkpoint_step = get_step_from_checkpoint_path(checkpoint_path)
-  decodes = decode(
-      estimator, input_fn, vocabulary, checkpoint_path=checkpoint_path)
-  # Remove any padded examples
-  dataset_size = len(inputs) * repeats
-  decodes = decodes[:dataset_size]
-  output_filename = "{}-{}".format(output_filename, checkpoint_step)
-  write_lines_to_file(decodes, output_filename)
+    inputs = []
+    dst_styles = []
+    codeprefixes = []
+    for l in inputs_split:
+        inputs.append(l[0])
+        dst_styles.append(l[1])
+        if l[1] == "1":
+            codeprefixes.append(target_prefix_style_1)
+        elif l[1] == "2":
+            codeprefixes.append(target_prefix_style_2)
+        else:
+            codeprefixes.append("")
+
+    all_input_ids = encode_inputs(inputs, vocabulary, model_type, batch_size,
+                                  sequence_length["inputs"], eos_id=eos_id)
+    if style_dependant_prefix_target:
+        all_codeprefix_ids = encode_inputs(codeprefixes, vocabulary, "lm", batch_size,
+                                           sequence_length["codeprefix"], eos_id=eos_id)
+
+    def input_fn(params):
+        del params
+
+        tensors = {"inputs": all_input_ids}
+        if style_embedding:
+            tensors["style"] = dst_styles
+        if style_dependant_prefix_target:
+            tensors["codeprefix"] = all_codeprefix_ids
+
+        dataset = tf.data.Dataset.from_tensor_slices(tensors)
+        if style_embedding:
+            dataset = process_style(dataset, mode="infer")
+        dataset = dataset.flat_map(
+            lambda x: tf.data.Dataset.from_tensors(x).repeat(repeats))
+        dataset = dataset.batch(batch_size, drop_remainder=True)
+        dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
+        return dataset
+
+    checkpoint_step = get_step_from_checkpoint_path(checkpoint_path)
+    decodes = decode(
+        estimator, input_fn, vocabulary, checkpoint_path=checkpoint_path
+    )
+    # Remove any padded examples
+    dataset_size = len(inputs) * repeats
+    decodes = decodes[:dataset_size]
+    output_filename = "{}-{}".format(output_filename, checkpoint_step)
+    write_lines_to_file(decodes, output_filename)
 
 
 @gin.configurable
 def infer_model_ll(estimator,
-                vocabulary,
-                sequence_length,
-                batch_size,
-                model_type,
-                model_dir,
-                eval_checkpoint_step,
-                input_filename=None,
-                output_filename=None,
-                checkpoint_paths=None,
-                decode_from_file_fn=decode_from_file_ll):
+                   vocabulary,
+                   sequence_length,
+                   batch_size,
+                   model_type,
+                   model_dir,
+                   eval_checkpoint_step,
+                   input_filename=None,
+                   output_filename=None,
+                   checkpoint_paths=None,
+                   decode_from_file_fn=decode_from_file,
+                   target_prefix_style_1="",
+                   target_prefix_style_2="",
+                   style_dependant_prefix_target=False,
+                   style_embedding=False):
   """Infer a Mesh-TF model.
   Args:
     estimator: Estimator object, created with the appropriate model_fn.
@@ -896,6 +936,13 @@ def infer_model_ll(estimator,
     checkpoint_paths: optional list of checkpoints to run inference for
     decode_from_file_fn: decoding function, defaults to decode_from_file
   """
+  if style_dependant_prefix_target or style_embedding:
+      decode_from_file_fn = functools.partial(decode_from_file_ll,
+                                              target_prefix_style_1=target_prefix_style_1,
+                                              target_prefix_style_2=target_prefix_style_2,
+                                              style_dependant_prefix_target=style_dependant_prefix_target,
+                                              style_embedding=style_embedding)
+
   if checkpoint_paths is None:
     checkpoint_paths = get_checkpoint_iterator(eval_checkpoint_step, model_dir)
 

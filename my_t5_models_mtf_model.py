@@ -14,7 +14,8 @@ from my_t5_models_mesh_transformer import mesh_train_dataset_fn_ll, mesh_eval_da
 class MtfModel_ll(MtfModel):
     def __init__(self, *mtfmodel_args, style_bit=True, unsupervised_style_transfer_metrics=True,
                  style_dependant_prefix_target=True, style_embedding=False, shift_decoder_output=False,
-                 left_pad_amt_1=0, left_pad_amt_2=0,**mtfmodel_kwargs):
+                 left_pad_amt_1=0, left_pad_amt_2=0, target_prefix_style_1="", target_prefix_style_2="",
+                 **mtfmodel_kwargs):
         super().__init__(*mtfmodel_args, **mtfmodel_kwargs)
         self.style_bit = style_bit
         self.unsupervised_style_transfer_metrics = unsupervised_style_transfer_metrics
@@ -23,6 +24,8 @@ class MtfModel_ll(MtfModel):
         self.shift_decoder_output = shift_decoder_output
         self.left_pad_amt_1 = left_pad_amt_1
         self.left_pad_amt_2 = left_pad_amt_2
+        self.target_prefix_style_1 = target_prefix_style_1
+        self.target_prefix_style_2 = target_prefix_style_2
 
     def train(self, mixture_or_task_name, steps, init_checkpoint=None,
               split="train"):
@@ -120,4 +123,7 @@ class MtfModel_ll(MtfModel):
         infer_model_ll(self.estimator(vocabulary), vocabulary,
                        self._sequence_length, self.batch_size,
                        self._model_type, self._model_dir, checkpoint_steps,
-                       input_file, output_file)
+                       input_file, output_file, target_prefix_style_1=self.target_prefix_style_1,
+                       target_prefix_style_2=self.target_prefix_style_2,
+                       style_dependant_prefix_target=self.style_dependant_prefix_target,
+                       style_embedding=self.style_embedding)
