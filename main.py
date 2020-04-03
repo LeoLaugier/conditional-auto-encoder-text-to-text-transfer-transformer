@@ -583,7 +583,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "IMDB"  # CCTK or IMDB
-    counter = 140
+    counter = 200
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
