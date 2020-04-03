@@ -641,7 +641,7 @@ if __name__ == "__main__":
     DATA_DIR = os.path.join(BASE_DIR, DATA_DIR_NAME)
     MODELS_DIR = os.path.join(BASE_DIR, MODELS_DIR_NAME)
     ON_CLOUD = True
-    USE_COLAB_TPU = False
+    USE_COLAB_TPU = True
 
     MODEL_SIZE = "small"  # ["small", "base", "large", "3B", "11B"]
     # Public GCS path for T5 pre-trained model checkpoints
