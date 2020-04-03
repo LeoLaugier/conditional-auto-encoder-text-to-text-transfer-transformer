@@ -44,11 +44,10 @@ def test_tpu():
 
 @contextmanager
 def tf_verbosity_level(level):
-  og_level = tf.compat.v1.logging.get_verbosity()
-  tf.compat.v1.logging.get_verbosity(level)
+  og_level = tf.logging.get_verbosity()
+  tf.logging.set_verbosity(level)
   yield
-  tf.compat.v1.logging.get_verbosity(og_level)
-
+  tf.logging.set_verbosity(og_level)
 
 def main():
     if ON_CLOUD:
