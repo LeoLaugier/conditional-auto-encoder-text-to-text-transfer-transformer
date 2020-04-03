@@ -821,7 +821,6 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                 len(decodes), expected_pad))
 
 @gin.configurable
-@gin.configurable
 def decode_from_file_ll(estimator,
                         vocabulary,
                         model_type,
