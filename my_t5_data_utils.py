@@ -145,7 +145,7 @@ class Task_ll(t5.data.utils.Task):
             ds = self._get_cached_dataset(split, shuffle)
         else:
             ds = self._dataset_fn(split=split, shuffle_files=shuffle)
-            if self.balance_styles:
+            if self.balance_styles and mode =="train":
                 ds = ds.filter(functools.partial(balance_fn, balance_rate = self.balance_rate))
             ds = self.preprocess_text_ll(ds)
             # Tokenize

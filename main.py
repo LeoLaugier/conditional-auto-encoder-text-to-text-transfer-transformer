@@ -11,6 +11,8 @@ import fasttext
 import gin
 import kenlm
 import subprocess
+
+import re
 from mesh_tensorflow.transformer import transformer, utils
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -25,7 +27,7 @@ from eval import print_random_predictions
 from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
 from my_mesh_tensorflow_transformer_utils import build_model_ll, tpu_estimator_model_fn_ll
 from my_t5_data_preprocessors import denoise_ll
-from my_t5_data_utils import TaskRegistry_ll, MixtureRegistry_ll
+from my_t5_data_utils import TaskRegistry_ll, MixtureRegistry_ll, TfdsTask_ll
 from my_utils import download_from_bucket_to_local, upload_blob
 from my_t5_models_mtf_model import MtfModel_ll
 
@@ -129,8 +131,22 @@ def main():
         task_kwargs = {"dataset_fn": tsv_to_dataset_fn}
         task_cls = []
 
-    # TODO CCTK, other datasets
-    # TODO balance_fn
+    elif DATASET=="CCTK":
+        tf.compat.v1.logging.info("Saving CCTK")
+        ds = tfds.load(
+            "civil_comments",
+            data_dir=DATA_DIR,
+            # Download data locally for preprocessing to avoid using GCS space.
+            download_and_prepare_kwargs={"download_dir": "./downloads"})
+
+        print("A few raw validation examples...")
+        for ex in tfds.as_numpy(ds["validation"].take(5)):
+            print(ex)
+
+        task_kwargs = {"tfds_name": "civil_comments:0.9.0", "tfds_data_dir": DATA_DIR,
+                       "balance_styles": BALANCE_STYLES, "balance_rate": BALANCE_RATE}
+        task_cls = [TfdsTask_ll]
+
 
     ### Metrics
     metric_fns = [our_bleu]
@@ -140,11 +156,9 @@ def main():
     pretrained_ppl_filename = '%s_%s.binary' % ("ppl", DATASET.lower())
     pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
     pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
-    print(os.path.join(BASE_DIR,pretrained_ppl_gcs_path))
-    print(tf.io.gfile.exists(os.path.join(BASE_DIR,pretrained_ppl_gcs_path)))
 
     if os.path.exists(pretrained_ppl_local_path) or tf.io.gfile.exists(os.path.join(BASE_DIR, pretrained_ppl_gcs_path)):
-        if not os.path.exists(pretrained_ppl_local_path):  # Pre-trained ppl model fond in GCS
+        if not os.path.exists(pretrained_ppl_local_path):  # Pre-trained ppl model found in GCS
             tf.compat.v1.logging.info("Downloading pre-trained perplexity model from GCS...")
             download_from_bucket_to_local(gcs_service, BUCKET, pretrained_ppl_gcs_path, pretrained_ppl_local_path)
             tf.compat.v1.logging.info('Download %s complete' % pretrained_ppl_filename)
@@ -511,6 +525,7 @@ def main():
     # Manually apply preprocessing
     with tf.io.gfile.GFile(predict_inputs_path, "w") as f:
         for c in comments:
+            c = re.sub(r'\n', r"\\n", c, flags=re.S)
             f.write("%s\n" % c.lower())
 
     # Ignore any logging so that we only see the model's answers to the questions.

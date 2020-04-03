@@ -621,6 +621,20 @@ def tpu_estimator_model_fn_ll(model_type,
     return my_model_fn
 
 
+def write_lines_to_file_ll(lines, filename):
+  """Write each line to a filename, replacing the file if it exists.
+  Args:
+    lines: list of str, lines to write out.
+    filename: str, path to filename.
+  """
+  if tf.io.gfile.exists(filename):
+    tf.io.gfile.remove(filename)
+  with tf.io.gfile.GFile(filename, "w") as output_file:
+    for line in lines:
+      l = re.sub(r'\n', r"\\n", line, flags=re.S)
+      output_file.write("{}\n".format(l))
+
+
 def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                   dataset_split, model_dir, eval_dataset_fn, eval_summary_dir,
                   eval_checkpoint_step, style_bit=True, unsupervised_style_transfer_metrics=True,
@@ -781,7 +795,7 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                 eval_summary_dir,
                 "{}_{}_predictions".format(eval_dataset.name, global_step),
             )
-            write_lines_to_file(predictions, predictions_filename)
+            write_lines_to_file_ll(predictions, predictions_filename)
 
             for metric_fn in eval_dataset.metric_fns:
                 summary = tf.Summary()
