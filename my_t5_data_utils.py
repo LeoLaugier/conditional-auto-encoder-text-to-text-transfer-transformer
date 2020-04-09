@@ -20,9 +20,9 @@ def balance_fn(x, balance_rate=0):
 
 # Need to redefine TfdsTask because Task was not made to process non string inputs
 class Task_ll(t5.data.utils.Task):
-    def __init__(self, *task_args, denoise=None, balance_styles=False, balance_rate=0, **task_kwargs):
+    def __init__(self, *task_args, balance_styles=False, balance_rate=0, **task_kwargs):
         super().__init__(*task_args, **task_kwargs)
-        self.denoise = denoise
+        self.denoise = task_kwargs["token_preprocessor"]
         self.balance_styles = balance_styles
         self.balance_rate = balance_rate
 

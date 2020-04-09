@@ -833,7 +833,7 @@ def decode_from_file_ll(estimator,
                         repeats=1,
                         target_prefix_style_1="",
                         target_prefix_style_2="",
-                        style_dependant_prefix_target=False,
+                        style_dependant_prefix_target=True,
                         style_embedding=False):
     """Decode from a text file and write to output_filename.
     Args:
