@@ -12,7 +12,12 @@ import gin
 import kenlm
 import subprocess
 
+import torch
+from transformers import AutoModelWithLMHead, BertForSequenceClassification, BertConfig
+import torch_xla.core.xla_model as xm
+
 import re
+
 from mesh_tensorflow.transformer import transformer, utils
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -20,8 +25,10 @@ import t5
 import t5.data.sentencepiece_vocabulary as sentencepiece_processor
 from googleapiclient.discovery import build
 import tensorflow_hub as hub
+from pytorch_transformers import AutoTokenizer, AutoConfig
 
-from automatic_metrics.automatic_metrics import our_bleu, perplexity, style_accuracy, sentence_similarity
+from automatic_metrics.automatic_metrics import our_bleu, kenlm_perplexity, sentence_similarity, \
+    fasttext_style_accuracy, gpt_perplexity, bert_style_accuracy
 from dataset import raw_to_tsv, st_preprocessor, raw_to_fasttext_input
 from eval import print_random_predictions
 from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
@@ -153,6 +160,8 @@ def main():
 
     ## Perplexity
     pretrained_ppl_filename = '%s_%s.binary' % ("ppl", DATASET.lower())
+    if PPL_ARCHITECTURE == "gpt2":
+        pretrained_ppl_filename = '%gpt2_%s_%s.pt' % ("ppl", DATASET.lower())
     pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
     pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
 
@@ -162,8 +171,19 @@ def main():
             download_from_bucket_to_local(gcs_service, BUCKET, pretrained_ppl_gcs_path, pretrained_ppl_local_path)
             tf.compat.v1.logging.info('Download %s complete' % pretrained_ppl_filename)
 
-        pretrained_ppl_model = kenlm.Model(pretrained_ppl_local_path)
-        metric_fns.append(functools.partial(perplexity, ppl_model=pretrained_ppl_model))
+        if PPL_ARCHITECTURE=="kenlm":
+            pretrained_ppl_model = kenlm.Model(pretrained_ppl_local_path)
+            metric_fns.append(functools.partial(kenlm_perplexity, ppl_model=pretrained_ppl_model))
+        elif PPL_ARCHITECTURE=="gpt2":
+            device = xm.xla_device()
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            config = AutoConfig.from_pretrained("gpt2")
+            pretrained_ppl_model = AutoModelWithLMHead.from_config(config)
+            pretrained_ppl_model.load_state_dict(torch.load(pretrained_ppl_local_path))
+            pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
+            pretrained_ppl_model.to(device)
+            metric_fns.append(functools.partial(gpt_perplexity, ppl_model=pretrained_ppl_model, tokenizer=tokenizer,
+                                                device=device))
     else:  # Train and upload ppl model
         tf.compat.v1.logging.warn(
             "Pre-trained perplexity model not found neither on local nor on bucket."
@@ -173,6 +193,8 @@ def main():
 
     ## Accuracy
     pretrained_acc_filename = '%s_%s.bin' % ("acc", DATASET.lower())
+    if ACC_ARCHITECTURE == "BERT":
+        pretrained_acc_filename = '%bert_%s_%s.pt' % ("acc", DATASET.lower())
     pretrained_acc_local_path = os.path.join('acc_binaries', pretrained_acc_filename)
     pretrained_acc_gcs_path = os.path.join('acc_binaries', pretrained_acc_filename)
 
@@ -250,8 +272,19 @@ def main():
                 tf.compat.v1.logging.info('Done with uploading the pre-trained fasttext model %s to the bucket.'
                                 % pretrained_acc_filename)
 
-    pretrained_acc_model = fasttext.load_model(pretrained_acc_local_path)
-    metric_fns.append(functools.partial(style_accuracy, classifier_model=pretrained_acc_model))
+    if ACC_ARCHITECTURE == "fasttext":
+        pretrained_acc_model = fasttext.load_model(pretrained_acc_local_path)
+        metric_fns.append(functools.partial(fasttext_style_accuracy, classifier_model=pretrained_acc_model))
+    elif ACC_ARCHITECTURE == "BERT":
+        device = xm.xla_device()
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        config = BertConfig.from_pretrained("bert-base-uncased", num_labels=2)
+        pretrained_acc_model = BertForSequenceClassification.from_pretrained("bert-base-uncased", config=config) # BertForSequenceClassification.from_config(config)
+        pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path))
+        pretrained_acc_model = xm.send_cpu_data_to_device(pretrained_acc_model, device)
+        pretrained_acc_model.to(device)
+        metric_fns.append(functools.partial(bert_style_accuracy, classifier_model=pretrained_acc_model,
+                                            tokenizer=tokenizer, device=device))
 
     ## Similarity
     module_url = "https://tfhub.dev/google/universal-sentence-encoder/2"
@@ -635,6 +668,8 @@ if __name__ == "__main__":
     # Eval
     EVAL = True
     UNSUPERVISED_STYLE_TRANSFER_METRICS = True
+    PPL_ARCHITECTURE = "gpt2"
+    ACC_ARCHITECTURE = "BERT"
 
     # GCS setting
     BUCKET = "test-t5"
