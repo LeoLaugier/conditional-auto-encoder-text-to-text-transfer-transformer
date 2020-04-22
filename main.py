@@ -13,7 +13,7 @@ import kenlm
 import subprocess
 
 import torch
-from transformers import AutoModelWithLMHead, BertForSequenceClassification, BertConfig
+from transformers import AutoModelWithLMHead, BertForSequenceClassification, BertConfig, AutoTokenizer, AutoConfig
 import torch_xla.core.xla_model as xm
 
 import re
@@ -25,7 +25,6 @@ import t5
 import t5.data.sentencepiece_vocabulary as sentencepiece_processor
 from googleapiclient.discovery import build
 import tensorflow_hub as hub
-from pytorch_transformers import AutoTokenizer, AutoConfig
 
 from automatic_metrics.automatic_metrics import our_bleu, kenlm_perplexity, sentence_similarity, \
     fasttext_style_accuracy, gpt_perplexity, bert_style_accuracy
