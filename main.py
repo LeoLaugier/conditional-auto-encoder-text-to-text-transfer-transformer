@@ -160,7 +160,7 @@ def main():
     ## Perplexity
     pretrained_ppl_filename = '%s_%s.binary' % ("ppl", DATASET.lower())
     if PPL_ARCHITECTURE == "gpt2":
-        pretrained_ppl_filename = '%gpt2_%s_%s.pt' % ("ppl", DATASET.lower())
+        pretrained_ppl_filename = 'gpt2_%s_%s.pt' % ("ppl", DATASET.lower())
     pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
     pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
 
@@ -179,7 +179,7 @@ def main():
             config = AutoConfig.from_pretrained("gpt2")
             pretrained_ppl_model = AutoModelWithLMHead.from_config(config)
             pretrained_ppl_model.load_state_dict(torch.load(pretrained_ppl_local_path))
-            pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
+            # pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
             pretrained_ppl_model.to(device)
             metric_fns.append(functools.partial(gpt_perplexity, ppl_model=pretrained_ppl_model, tokenizer=tokenizer,
                                                 device=device))
@@ -193,7 +193,7 @@ def main():
     ## Accuracy
     pretrained_acc_filename = '%s_%s.bin' % ("acc", DATASET.lower())
     if ACC_ARCHITECTURE == "BERT":
-        pretrained_acc_filename = '%bert_%s_%s.pt' % ("acc", DATASET.lower())
+        pretrained_acc_filename = 'bert_%s_%s.pt' % ("acc", DATASET.lower())
     pretrained_acc_local_path = os.path.join('acc_binaries', pretrained_acc_filename)
     pretrained_acc_gcs_path = os.path.join('acc_binaries', pretrained_acc_filename)
 
@@ -277,9 +277,9 @@ def main():
     elif ACC_ARCHITECTURE == "BERT":
         device = xm.xla_device()
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-        config = BertConfig.from_pretrained("bert-base-uncased", num_labels=2)
+        config = BertConfig.from_pretrained("bert-base-uncased", num_labels=1)
         pretrained_acc_model = BertForSequenceClassification.from_pretrained("bert-base-uncased", config=config) # BertForSequenceClassification.from_config(config)
-        pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path))
+        pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path), map_location=torch.device('cpu'))
         pretrained_acc_model = xm.send_cpu_data_to_device(pretrained_acc_model, device)
         pretrained_acc_model.to(device)
         metric_fns.append(functools.partial(bert_style_accuracy, classifier_model=pretrained_acc_model,
@@ -615,7 +615,7 @@ if __name__ == "__main__":
     BALANCE_RATE = 0
 
     # Task / dataset
-    DATASET = "IMDB"  # CCTK or IMDB
+    DATASET = "CCTK"  # CCTK or IMDB
     counter = 200
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"

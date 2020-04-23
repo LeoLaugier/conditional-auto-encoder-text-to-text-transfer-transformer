@@ -4,7 +4,7 @@ import t5
 import tensorflow as tf
 import torch
 from torch.nn.utils.rnn import pad_sequence
-from transformers.utils import InputFeatures
+from transformers.data.processors.utils import InputFeatures
 
 def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, styles_origin=None):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,

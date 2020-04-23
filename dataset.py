@@ -7,7 +7,7 @@ def raw_to_tsv(in_fname_pos, in_fname_neg, out_fname):
        tf.io.gfile.GFile(out_fname, "w") as outfile:
     pos_sentences  = infile_pos.readlines()
     for sentence in pos_sentences:
-      sentence = sentence.rstrip()
+      sentence = sentence.rstrip().replace("\\n", "\n")
       # sentence = sentence.decode("utf-8")
       # outfile.write(sentence+"\t"+"1\n")
       outfile.write("%s\t%s\n" % (sentence.decode("utf-8"), "1"))
