@@ -469,90 +469,158 @@ def main():
         print_random_predictions(TASK_NAME, sequence_length, MODEL_DIR, n=10)
 
     # evaluate on made-up comments
-    comment_style_pairs = [
+    if DATASET == "IMDB":
+        comment_style_pairs = [
 
-        {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
-         "Destination style": "Positive"},
-        {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
-         "Destination style": "Negative"},
+            {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
+             "Destination style": "Positive"},
+            {"text": "the casting is poor , the script is awful , and the directing is dreadful .",
+             "Destination style": "Negative"},
 
-        {"text": "this humor is not funny , and is actually too gay for it 's own good .",
-         "Destination style": "Positive"},
-        {"text": "this humor is not funny , and is actually too gay for it 's own good .",
-         "Destination style": "Negative"},
+            {"text": "this humor is not funny , and is actually too gay for it 's own good .",
+             "Destination style": "Positive"},
+            {"text": "this humor is not funny , and is actually too gay for it 's own good .",
+             "Destination style": "Negative"},
 
-        {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
-         "Destination style": "Positive"},
-        {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
-         "Destination style": "Negative"},
+            {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
+             "Destination style": "Positive"},
+            {"text": "why would any legitimate actor having read the script participated in this piece of crap ?",
+             "Destination style": "Negative"},
 
-        {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
-         "Destination style": "Positive"},
-        {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
-         "Destination style": "Negative"},
+            {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
+             "Destination style": "Positive"},
+            {"text": "i give it 1 out of 10 because it 's the lowest grade imdb has to offer .",
+             "Destination style": "Negative"},
 
-        {
-            "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
-            "Destination style": "Positive"},
-        {
-            "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
-            "Destination style": "Negative"},
+            {
+                "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
+                "Destination style": "Positive"},
+            {
+                "text": "whenever disney characters reach adulthood these days they become either obnoxious or just plain boring .",
+                "Destination style": "Negative"},
 
-        {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
-         "Destination style": "Positive"},
-        {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
-         "Destination style": "Negative"},
+            {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
+             "Destination style": "Positive"},
+            {"text": "i 'm very , very sorry for every single minute i wasted on this one .",
+             "Destination style": "Negative"},
 
-        {"text": "Very bad movie !",
-         "Destination style": "Positive"},
-        {"text": "Very bad movie !",
-         "Destination style": "Negative"},
+            {"text": "Very bad movie !",
+             "Destination style": "Positive"},
+            {"text": "Very bad movie !",
+             "Destination style": "Negative"},
 
-        {"text": "do not buy this movie .",
-         "Destination style": "Positive"},
-        {"text": "do not buy this movie .",
-         "Destination style": "Negative"},
+            {"text": "do not buy this movie .",
+             "Destination style": "Positive"},
+            {"text": "do not buy this movie .",
+             "Destination style": "Negative"},
 
-        {"text": "do buy this movie .",
-         "Destination style": "Negative"},
-        {"text": "do buy this movie .",
-         "Destination style": "Positive"},
+            {"text": "do buy this movie .",
+             "Destination style": "Negative"},
+            {"text": "do buy this movie .",
+             "Destination style": "Positive"},
 
-        {"text": "Very good movie !",
-         "Destination style": "Negative"},
-        {"text": "Very good movie !",
-         "Destination style": "Positive"},
+            {"text": "Very good movie !",
+             "Destination style": "Negative"},
+            {"text": "Very good movie !",
+             "Destination style": "Positive"},
 
-        {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
-         "Destination style": "Negative"},
-        {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
-         "Destination style": "Positive"},
+            {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
+             "Destination style": "Negative"},
+            {"text": "i actually really disliked her music before , but they fit perfectly in this movie .",
+             "Destination style": "Positive"},
 
-        {"text": "a comedy that will warm your heart .",
-         "Destination style": "Negative"},
-        {"text": "a comedy that will warm your heart .",
-         "Destination style": "Positive"},
+            {"text": "a comedy that will warm your heart .",
+             "Destination style": "Negative"},
+            {"text": "a comedy that will warm your heart .",
+             "Destination style": "Positive"},
 
-        {"text": "this may seem odd , but i highly recommend it .",
-         "Destination style": "Negative"},
-        {"text": "this may seem odd , but i highly recommend it .",
-         "Destination style": "Positive"},
+            {"text": "this may seem odd , but i highly recommend it .",
+             "Destination style": "Negative"},
+            {"text": "this may seem odd , but i highly recommend it .",
+             "Destination style": "Positive"},
 
-        {"text": "scott bakula is wonderful in the part of the senior investigator .",
-         "Destination style": "Negative"},
-        {"text": "scott bakula is wonderful in the part of the senior investigator .",
-         "Destination style": "Positive"},
+            {"text": "scott bakula is wonderful in the part of the senior investigator .",
+             "Destination style": "Negative"},
+            {"text": "scott bakula is wonderful in the part of the senior investigator .",
+             "Destination style": "Positive"},
 
-        {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
-         "Destination style": "Negative"},
-        {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
-         "Destination style": "Positive"},
+            {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
+             "Destination style": "Negative"},
+            {"text": "even if at times things do get a little slow , it 's still a rewarding and informative experience .",
+             "Destination style": "Positive"},
 
-        {"text": "i give this movie 8 stars out of 10 .",
-         "Destination style": "Negative"},
-        {"text": "i give this movie 8 stars out of 10 .",
-         "Destination style": "Positive"}
-    ]
+            {"text": "i give this movie 8 stars out of 10 .",
+             "Destination style": "Negative"},
+            {"text": "i give this movie 8 stars out of 10 .",
+             "Destination style": "Positive"}
+        ]
+
+    elif DATASET == "processed_CCTK":
+        comment_style_pairs = [
+    
+            {"text": "You are stupid.",
+             "Destination style": "Non toxic"},
+            {"text": "You are stupid.",
+             "Destination style": "Toxic"},
+
+            {"text": "Thank you, you are nice.",
+             "Destination style": "Toxic"},
+            {"text": "Thank you, you are nice.",
+             "Destination style": "Non toxic"},
+
+            {
+                "text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
+                "Destination style": "Non toxic"},
+            {
+                "text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
+                "Destination style": "Toxic"},
+
+            {"text": "Donald Trump is best president ever",
+             "Destination style": "Toxic"},
+            {"text": "Donald Trump is the dumbest person ever",
+             "Destination style": "Non toxic"},
+
+            {"text": "He's been covering for Trump the whole time, fool!",
+             "Destination style": "Non toxic"},
+            {"text": "He's been covering for Trump the whole time, fool!",
+             "Destination style": "Toxic"},
+
+            {"text": "die, please, you rino s.o.b.",
+             "Destination style": "Non toxic"},
+            {"text": "die, please, you rino s.o.b.",
+             "Destination style": "Toxic"},
+
+            {
+                "text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
+                "Destination style": "Non toxic"},
+            {
+                "text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
+                "Destination style": "Toxic"},
+
+            {"text": "Nailed Aces fans.  They are not real hockey fans.  Just a bunch of drunk morons.",
+             "Destination style": "Non toxic"},
+            {"text": "Nailed Aces fans.  They are not real hockey fans.  Just a bunch of drunk morons.",
+             "Destination style": "Toxic"},
+
+            {"text": "How about experimenting with fixing our City's infrastructure mainly roads. Idiots.",
+             "Destination style": "Non toxic"},
+            {"text": "How about experimenting with fixing our City's infrastructure mainly roads. Idiots.",
+             "Destination style": "Toxic"},
+
+            {
+                "text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
+                "Destination style": "Non toxic"},
+            {
+                "text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
+                "Destination style": "Toxic"},
+
+            {
+                "text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {
+                "text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+        ]
 
     comments = []
     for p in comment_style_pairs:
