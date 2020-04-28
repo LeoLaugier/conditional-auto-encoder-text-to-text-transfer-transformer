@@ -557,7 +557,7 @@ def main():
 
     elif DATASET == "processed_CCTK":
         comment_style_pairs = [
-    
+
             {"text": "You are stupid.",
              "Destination style": "Non toxic"},
             {"text": "You are stupid.",
@@ -732,7 +732,7 @@ if __name__ == "__main__":
         BALANCE_STYLES = True
         BALANCE_RATE = 90291/5653785
 
-        DATASET_RAW_DIR = "gs://test-t5/imdb_processed"
+        DATASET_RAW_DIR = "gs://test-t5/civil_comment_processed"
 
 
 

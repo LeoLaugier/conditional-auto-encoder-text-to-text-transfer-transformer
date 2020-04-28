@@ -5,15 +5,15 @@ def raw_to_tsv(in_fname_1, in_fname_0, out_fname):
   with tf.io.gfile.GFile(in_fname_1, "rb") as infile_1,\
        tf.io.gfile.GFile(in_fname_0, "rb") as infile_0,\
        tf.io.gfile.GFile(out_fname, "w") as outfile:
-    pos_sentences  = infile_1.readlines()
-    for sentence in pos_sentences:
+    sentences_1  = infile_1.readlines()
+    for sentence in sentences_1:
       sentence = sentence.rstrip().replace("\\n", "\n")
       # sentence = sentence.decode("utf-8")
       # outfile.write(sentence+"\t"+"1\n")
       outfile.write("%s\t%s\n" % (sentence.decode("utf-8"), "1"))
-    neg_sentences  = infile_0.readlines()
-    for sentence in neg_sentences:
-      sentence = sentence.rstrip()
+    sentences_0  = infile_0.readlines()
+    for sentence in sentences_0:
+      sentence = sentence.rstrip().replace("\\n", "\n")
       outfile.write("%s\t%s\n" % (sentence.decode("utf-8"), "0"))
 
 
