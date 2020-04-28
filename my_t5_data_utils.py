@@ -11,7 +11,7 @@ import tensorflow_datasets as tfds
 
 
 def balance_fn(x, balance_rate=0):
-    if x["toxicity"] <= 0.5:
+    if x["style"] <= 0.5: # tfds civil comments : "toxicity"
         draw = tf.random.uniform([], maxval=1)
         return draw < balance_rate
     else:

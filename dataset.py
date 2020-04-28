@@ -1,17 +1,17 @@
 import tensorflow as tf
 
 
-def raw_to_tsv(in_fname_pos, in_fname_neg, out_fname):
-  with tf.io.gfile.GFile(in_fname_pos, "rb") as infile_pos,\
-       tf.io.gfile.GFile(in_fname_neg, "rb") as infile_neg,\
+def raw_to_tsv(in_fname_1, in_fname_0, out_fname):
+  with tf.io.gfile.GFile(in_fname_1, "rb") as infile_1,\
+       tf.io.gfile.GFile(in_fname_0, "rb") as infile_0,\
        tf.io.gfile.GFile(out_fname, "w") as outfile:
-    pos_sentences  = infile_pos.readlines()
+    pos_sentences  = infile_1.readlines()
     for sentence in pos_sentences:
       sentence = sentence.rstrip().replace("\\n", "\n")
       # sentence = sentence.decode("utf-8")
       # outfile.write(sentence+"\t"+"1\n")
       outfile.write("%s\t%s\n" % (sentence.decode("utf-8"), "1"))
-    neg_sentences  = infile_neg.readlines()
+    neg_sentences  = infile_0.readlines()
     for sentence in neg_sentences:
       sentence = sentence.rstrip()
       outfile.write("%s\t%s\n" % (sentence.decode("utf-8"), "0"))
@@ -33,7 +33,7 @@ def st_preprocessor(ds, dataset=None, style_bit=False,
         {"inputs": ..., ["style": ..., "codeprefixedtargets": ..., "codeprefix": ...,] "targets": ...}.
     """
     style = None
-    if dataset == "IMDB":
+    if dataset == "IMDB" or dataset == "processed_CCTK":
       style = tf.strings.to_number(ex["style"], tf.int32)
     elif dataset == "CCTK":
       style = tf.dtypes.cast(tf.round(ex["toxicity"]), tf.int32)

@@ -92,7 +92,7 @@ def main():
     task_cls = []
     task_kwargs = {}
     ## Generating and / or loading datasets
-    if DATASET == "IMDB":
+    if DATASET == "IMDB" or DATASET == "processed_CCTK":
         dataset_tsv_path = {
             "train": os.path.join(DATA_DIR, "%s-train.tsv" % DATASET.lower()),
             "validation": os.path.join(DATA_DIR, "%s-validation.tsv" % DATASET.lower())
@@ -104,14 +104,20 @@ def main():
         # Generating tsv datasets
         if not train_tsv_exists or not validation_tsv_exists:
             tf.compat.v1.logging.info("Generating T5 TSVs.")
+            if DATASET == "IMDB":
+                ext0 = "neg"
+                ext1 = "pos"
+            elif DATASET == "processed_CCTK":
+                ext0 = "nontoxic"
+                ext1 = "toxic"
 
             if not train_tsv_exists:
-                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "train.pos"),
-                           os.path.join(DATASET_RAW_DIR, "train.neg"),
+                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "train.%s" % ext1),
+                           os.path.join(DATASET_RAW_DIR, "train.%s" % ext0),
                            dataset_tsv_path["train"])
             if not validation_tsv_exists:
-                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.pos"),
-                           os.path.join(DATASET_RAW_DIR, "dev.neg"),
+                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
+                           os.path.join(DATASET_RAW_DIR, "dev.%s" % ext0),
                            dataset_tsv_path["validation"])
             tf.compat.v1.logging.info("T5 TSVs generated.")
         # Loading datasets
@@ -136,7 +142,7 @@ def main():
         task_kwargs = {"dataset_fn": tsv_to_dataset_fn}
         task_cls = []
 
-    elif DATASET=="CCTK":
+    elif DATASET == "CCTK":
         tf.compat.v1.logging.info("Saving CCTK")
         ds = tfds.load(
             "civil_comments",
@@ -174,15 +180,16 @@ def main():
             pretrained_ppl_model = kenlm.Model(pretrained_ppl_local_path)
             metric_fns.append(functools.partial(kenlm_perplexity, ppl_model=pretrained_ppl_model))
         elif PPL_ARCHITECTURE=="gpt2":
-            device = xm.xla_device()
-            tokenizer = AutoTokenizer.from_pretrained("gpt2")
-            config = AutoConfig.from_pretrained("gpt2")
-            pretrained_ppl_model = AutoModelWithLMHead.from_config(config)
-            pretrained_ppl_model.load_state_dict(torch.load(pretrained_ppl_local_path))
-            # pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
-            pretrained_ppl_model.to(device)
-            metric_fns.append(functools.partial(gpt_perplexity, ppl_model=pretrained_ppl_model, tokenizer=tokenizer,
-                                                device=device))
+            if False:
+                device = xm.xla_device()
+                tokenizer = AutoTokenizer.from_pretrained("gpt2")
+                config = AutoConfig.from_pretrained("gpt2")
+                pretrained_ppl_model = AutoModelWithLMHead.from_config(config)
+                pretrained_ppl_model.load_state_dict(torch.load(pretrained_ppl_local_path))
+                pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
+                pretrained_ppl_model.to(device)
+                metric_fns.append(functools.partial(gpt_perplexity, ppl_model=pretrained_ppl_model, tokenizer=tokenizer,
+                                                    device=device))
     else:  # Train and upload ppl model
         tf.compat.v1.logging.warn(
             "Pre-trained perplexity model not found neither on local nor on bucket."
@@ -279,7 +286,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
         config = BertConfig.from_pretrained("bert-base-uncased", num_labels=1)
         pretrained_acc_model = BertForSequenceClassification.from_pretrained("bert-base-uncased", config=config) # BertForSequenceClassification.from_config(config)
-        pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path), map_location=torch.device('cpu'))
+        pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path, map_location=torch.device('cpu')))
         pretrained_acc_model = xm.send_cpu_data_to_device(pretrained_acc_model, device)
         pretrained_acc_model.to(device)
         metric_fns.append(functools.partial(bert_style_accuracy, classifier_model=pretrained_acc_model,
@@ -615,7 +622,7 @@ if __name__ == "__main__":
     BALANCE_RATE = 0
 
     # Task / dataset
-    DATASET = "CCTK"  # CCTK or IMDB
+    DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
     counter = 200
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
@@ -626,9 +633,10 @@ if __name__ == "__main__":
         TARGET_PREFIX_STYLE_1 = "Negative: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
         TARGET_PREFIX_STYLE_2 = "Positive: "  # "Positive: " "Style 2: " imunitar
         STYLE_IDS = {"Negative": "1", "Positive": "2"}
+
         DATASET_RAW_DIR = "gs://test-t5/imdb_processed"
 
-    else:
+    elif DATASET == "CCTK":
         TASK_NAME = "st_toxic_comments"
         MIXTURE_NAME = "st_toxic_comments_mixture"
         MODELS_DIR_NAME = "models_style_civil_comment_%d" % counter
@@ -639,9 +647,26 @@ if __name__ == "__main__":
         STYLE_IDS = {"Non toxic": "1", "Toxic": "2"}
 
         BALANCE_STYLES = True
-        BALANCE_RATE = 0.0736  # = 08% / (1 - 08%)
+        BALANCE_RATE = 0.0736  # ~ 08% / (1 - 08%)
 
         DATASET_RAW_DIR = None
+
+    elif DATASET == "processed_CCTK":
+        TASK_NAME = "st_processed_toxic_comments"
+        MIXTURE_NAME = "st_processed_toxic_comments_mixture"
+        MODELS_DIR_NAME = "models_style_processed_civil_comment_%d" % counter
+        DATA_DIR_NAME = "data_style_processed_civil_comment"
+
+        TARGET_PREFIX_STYLE_1 = "Non toxic: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
+        TARGET_PREFIX_STYLE_2 = "Toxic: "  # "Positive: " "Style 2: " imunitar
+        STYLE_IDS = {"Non toxic": "1", "Toxic": "2"}
+
+        BALANCE_STYLES = True
+        BALANCE_RATE = 90291/5653785
+
+        DATASET_RAW_DIR = "gs://test-t5/imdb_processed"
+
+
 
     # Make same-style batches and alternate batches of each style
     GROUP_BY_STYLE = True
