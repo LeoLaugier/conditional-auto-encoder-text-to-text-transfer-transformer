@@ -98,6 +98,9 @@ def main():
             "validation": os.path.join(DATA_DIR, "%s-validation.tsv" % DATASET.lower())
         }
 
+        if DATASET == "processed_CCTK":
+            dataset_tsv_path["validation"] = os.path.join(DATA_DIR, "%s-toxic-validation.tsv" % DATASET.lower())
+
         train_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["train"])
         validation_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["validation"])
 
@@ -107,18 +110,25 @@ def main():
             if DATASET == "IMDB":
                 ext0 = "neg"
                 ext1 = "pos"
+                mode ="rb"
             elif DATASET == "processed_CCTK":
                 ext0 = "nontoxic"
                 ext1 = "toxic"
+                mode = "r"
 
             if not train_tsv_exists:
                 raw_to_tsv(os.path.join(DATASET_RAW_DIR, "train.%s" % ext1),
                            os.path.join(DATASET_RAW_DIR, "train.%s" % ext0),
-                           dataset_tsv_path["train"])
+                           dataset_tsv_path["train"], mode)
             if not validation_tsv_exists:
-                raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
-                           os.path.join(DATASET_RAW_DIR, "dev.%s" % ext0),
-                           dataset_tsv_path["validation"])
+                if DATASET == "IMDB":
+                    raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
+                               os.path.join(DATASET_RAW_DIR, "dev.%s" % ext0),
+                               dataset_tsv_path["validation"], mode)
+                elif DATASET == "processed_CCTK":
+                    raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
+                               None,
+                               dataset_tsv_path["validation"], mode)
             tf.compat.v1.logging.info("T5 TSVs generated.")
         # Loading datasets
         def tsv_to_dataset_fn(split, shuffle_files=False):
