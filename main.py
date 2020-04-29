@@ -175,7 +175,8 @@ def main():
     ## Perplexity
     pretrained_ppl_filename = '%s_%s.binary' % ("ppl", DATASET.lower())
     if PPL_ARCHITECTURE == "gpt2":
-        pretrained_ppl_filename = 'gpt2_%s_%s.pt' % ("ppl", DATASET.lower())
+        if DATASET == "processed_CCTK":
+            pretrained_ppl_filename = 'gpt2_%s_%s.pt' % ("ppl", "CCTK".lower())
     pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
     pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
 
@@ -459,7 +460,7 @@ def main():
     with gin.unlock_config():
         gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
 
-    FINETUNE_STEPS = 500
+    FINETUNE_STEPS = 200000
 
     model.finetune(
         mixture_or_task_name=MIXTURE_NAME,
@@ -717,7 +718,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
-    counter = 200
+    counter = 201
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -802,7 +803,7 @@ if __name__ == "__main__":
     ON_CLOUD = True
     USE_COLAB_TPU = True
 
-    MODEL_SIZE = "small"  # ["small", "base", "large", "3B", "11B"]
+    MODEL_SIZE = "large"  # ["small", "base", "large", "3B", "11B"]
     # Public GCS path for T5 pre-trained model checkpoints
     BASE_PRETRAINED_DIR = "gs://t5-data/pretrained_models"
     PRETRAINED_DIR = os.path.join(BASE_PRETRAINED_DIR, MODEL_SIZE)
