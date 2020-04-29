@@ -1,4 +1,6 @@
 import tensorflow as tf
+import torch
+from torch.utils.data import Dataset
 
 
 def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
@@ -118,3 +120,15 @@ def raw_to_fasttext_input(in_fname_pos, in_fname_neg, out_fname):
     for sentence in neg_sentences:
       sentence = sentence.rstrip()
       outfile.write("__label__%s %s\n" % ("0", sentence.decode("utf-8")))
+
+
+class MyDataset(Dataset):
+  def __init__(self, tokenizer, prediction_list, block_size):
+    batch_encoding = tokenizer.batch_encode_plus(prediction_list, add_special_tokens=True, max_length=block_size)
+    self.examples = batch_encoding["input_ids"]
+
+  def __len__(self):
+    return len(self.examples)
+
+  def __getitem__(self, i) -> torch.Tensor:
+    return torch.tensor(self.examples[i], dtype=torch.long)

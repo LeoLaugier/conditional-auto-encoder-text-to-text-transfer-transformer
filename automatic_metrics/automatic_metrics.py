@@ -4,8 +4,32 @@ import t5
 import tensorflow as tf
 import torch
 from torch.nn.utils.rnn import pad_sequence
+from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 from transformers.data.processors.utils import InputFeatures
 from torchtext import data
+
+from dataset import MyDataset
+
+
+def gpt_perplexity_batch(targets, predictions, ppl_model, tokenizer, styles_origin=None, batch_size=8, block_size=256):
+  training_args = TrainingArguments(output_dir="./gpt2_preds", do_eval=True, per_gpu_eval_batch_size=batch_size)
+  eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
+  data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+  trainer = Trainer(
+    model=ppl_model,
+    args=training_args,
+    data_collator=data_collator,
+    eval_dataset=eval_dataset,
+    prediction_loss_only=True,
+  )
+
+  eval_output = trainer.evaluate()
+
+  perplexity = math.exp(eval_output["loss"])
+
+  return {"perplexity": perplexity}
+
 
 def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, styles_origin=None):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,
@@ -46,7 +70,7 @@ def kenlm_perplexity(targets, predictions, ppl_model, styles_origin=None):
 
 
 def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, styles_origin=None,
-                         batch_size=32):
+                              batch_size=32):
   # torchtext dataset
   init_token_idx = tokenizer.cls_token_id
   eos_token_idx = tokenizer.sep_token_id
@@ -72,7 +96,7 @@ def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer,
   LABEL = data.LabelField(dtype=torch.float)
   fields = [('comment_text', TEXT), ('style_origin', LABEL)]
 
-  examples = [data.Example.fromdict({"comment_text": prediction, "style_origin": style_origin}, fields)
+  examples = [data.Example.fromlist([prediction, style_origin], fields)
               for prediction, style_origin in zip(predictions, styles_origin)]
 
   val_data = data.Dataset(examples, fields)
