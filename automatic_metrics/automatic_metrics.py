@@ -66,7 +66,7 @@ def bert_style_accuracy(targets, predictions, classifier_model, tokenizer, devic
 
   with torch.no_grad():
     inputs = {"input_ids": all_input_ids, "attention_mask": all_attention_mask, "token_type_ids": all_token_type_ids}
-    prediction_labels = torch.round(torch.sigmoid(classifier_model(**inputs)))
+    prediction_labels = torch.round(torch.sigmoid(classifier_model(**inputs)[0].squeeze(1)))
 
   prediction_labels = prediction_labels.detach().cpu().numpy()
 

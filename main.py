@@ -127,7 +127,7 @@ def main():
                                dataset_tsv_path["validation"], mode)
                 elif DATASET == "processed_CCTK":
                     raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
-                               None,
+                               "",
                                dataset_tsv_path["validation"], mode)
             tf.compat.v1.logging.info("T5 TSVs generated.")
         # Loading datasets

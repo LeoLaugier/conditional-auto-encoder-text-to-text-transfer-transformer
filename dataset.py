@@ -7,17 +7,19 @@ def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
        tf.io.gfile.GFile(out_fname, "w") as outfile:
     sentences_1  = infile_1.readlines()
     for sentence in sentences_1:
-      sentence = sentence.rstrip().replace("\\n", "\n")
+      sentence = sentence.rstrip()
       # sentence = sentence.decode("utf-8")
       # outfile.write(sentence+"\t"+"1\n")
       if mode == "rb":
         sentence = sentence.decode("utf-8")
+      sentence = sentence.replace("\t", "\\t")
       outfile.write("%s\t%s\n" % (sentence, "1"))
     sentences_0  = infile_0.readlines()
     for sentence in sentences_0:
-      sentence = sentence.rstrip().replace("\\n", "\n")
+      sentence = sentence.rstrip()
       if mode == "rb":
         sentence = sentence.decode("utf-8")
+      sentence = sentence.replace("\t", "\\t")
       outfile.write("%s\t%s\n" % (sentence, "0"))
 
 
@@ -27,6 +29,8 @@ def st_preprocessor(ds, dataset=None, style_bit=False,
   def normalize_text(text):
     """Lowercase and remove quotes from a TensorFlow string."""
     text = tf.strings.lower(text)
+    text = tf.strings.regex_replace(text, br"\\n", b"\n")
+    text = tf.strings.regex_replace(text, br"\\t", b"\n")
     # text = tf.strings.regex_replace(text,"'(.*)'", r"\1")
     # TODO: add cleaning methods suitable for "dirty" comments. Maybe perspective has it? Or SentencePiece already does it.
     return text
