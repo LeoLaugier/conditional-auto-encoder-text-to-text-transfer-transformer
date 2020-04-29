@@ -1,6 +1,7 @@
 import functools
 import os
 import pprint
+import re
 import time
 import warnings
 # Improve logging.
@@ -15,8 +16,6 @@ import subprocess
 import torch
 from transformers import AutoModelWithLMHead, BertForSequenceClassification, BertConfig, AutoTokenizer, AutoConfig
 import torch_xla.core.xla_model as xm
-
-import re
 
 from mesh_tensorflow.transformer import transformer, utils
 import tensorflow as tf
@@ -299,8 +298,8 @@ def main():
         pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path, map_location=torch.device('cpu')))
         pretrained_acc_model = xm.send_cpu_data_to_device(pretrained_acc_model, device)
         pretrained_acc_model.to(device)
-        metric_fns.append(functools.partial(bert_style_accuracy, classifier_model=pretrained_acc_model,
-                                            tokenizer=tokenizer, device=device))
+        metric_fns.append(functools.partial(bert_style_accuracy_batch, classifier_model=pretrained_acc_model,
+                                            tokenizer=tokenizer, device=device, batch_size=ACC_EVAL_BATCH_SIZE))
 
     ## Similarity
     module_url = "https://tfhub.dev/google/universal-sentence-encoder/2"
@@ -772,6 +771,7 @@ if __name__ == "__main__":
     UNSUPERVISED_STYLE_TRANSFER_METRICS = True
     PPL_ARCHITECTURE = "gpt2"
     ACC_ARCHITECTURE = "BERT"
+    ACC_EVAL_BATCH_SIZE = 32
 
     # GCS setting
     BUCKET = "test-t5"

@@ -5,6 +5,7 @@ import tensorflow as tf
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from transformers.data.processors.utils import InputFeatures
+from torchtext import data
 
 def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, styles_origin=None):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,
@@ -43,7 +44,56 @@ def kenlm_perplexity(targets, predictions, ppl_model, styles_origin=None):
 
   return {"perplexity": perplexity}
 
-def bert_style_accuracy(targets, predictions, classifier_model, tokenizer, device, styles_origin=None):
+
+def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, styles_origin=None,
+                         batch_size=32):
+  # torchtext dataset
+  init_token_idx = tokenizer.cls_token_id
+  eos_token_idx = tokenizer.sep_token_id
+  pad_token_idx = tokenizer.pad_token_id
+  unk_token_idx = tokenizer.unk_token_id
+
+  max_input_length = 220  # tokenizer.max_model_input_sizes['bert-base-uncased']
+
+  def tokenize_and_cut(sentence):
+    tokens = tokenizer.tokenize(sentence)
+    tokens = tokens[:max_input_length - 2]
+    return tokens
+
+  TEXT = data.Field(batch_first=True,
+                    use_vocab=False,
+                    tokenize=tokenize_and_cut,
+                    preprocessing=tokenizer.convert_tokens_to_ids,
+                    init_token=init_token_idx,
+                    eos_token=eos_token_idx,
+                    pad_token=pad_token_idx,
+                    unk_token=unk_token_idx)
+
+  LABEL = data.LabelField(dtype=torch.float)
+  fields = [('comment_text', TEXT), ('style_origin', LABEL)]
+
+  examples = [data.Example.fromdict({"comment_text": prediction, "style_origin": style_origin}, fields)
+              for prediction, style_origin in zip(predictions, styles_origin)]
+
+  val_data = data.Dataset(examples, fields)
+  LABEL.build_vocab(val_data)
+  valid_iterator = data.BucketIterator(val_data, batch_size=batch_size, device=device)
+
+  epoch_acc = 0
+
+  classifier_model.eval()
+
+  with torch.no_grad():
+    for batch in valid_iterator:
+      prediction_labels = torch.round(torch.sigmoid(classifier_model(batch.comment_text)[0].squeeze(1)))
+      correct = (prediction_labels != batch.style_origin).float()
+      acc = correct.sum() / len(correct)
+      epoch_acc += acc.item()
+
+  return {"style_accuracy": epoch_acc / len(valid_iterator)}
+
+
+def bert_style_accuracy(targets, predictions, classifier_model, tokenizer, device, styles_origin=None, batch_size=32):
   batch_encoding = tokenizer.batch_encode_plus(predictions, max_length=tokenizer.max_len, pad_to_max_length=True)
 
   features = []
