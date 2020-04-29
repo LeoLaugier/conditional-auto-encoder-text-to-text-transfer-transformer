@@ -26,7 +26,7 @@ from googleapiclient.discovery import build
 import tensorflow_hub as hub
 
 from automatic_metrics.automatic_metrics import our_bleu, kenlm_perplexity, sentence_similarity, \
-    fasttext_style_accuracy, gpt_perplexity_batch, bert_style_accuracy_batch
+    fasttext_style_accuracy, gpt_perplexity_batch_280, bert_style_accuracy_batch
 from dataset import raw_to_tsv, st_preprocessor, raw_to_fasttext_input
 from eval import print_random_predictions
 from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
@@ -189,15 +189,15 @@ def main():
             pretrained_ppl_model = kenlm.Model(pretrained_ppl_local_path)
             metric_fns.append(functools.partial(kenlm_perplexity, ppl_model=pretrained_ppl_model))
         elif PPL_ARCHITECTURE=="gpt2":
-            # device = "cpu" # xm.xla_device()
+            device = "cpu" # xm.xla_device()
             tokenizer = AutoTokenizer.from_pretrained("gpt2")
             config = AutoConfig.from_pretrained("gpt2")
             pretrained_ppl_model = AutoModelWithLMHead.from_config(config)
             pretrained_ppl_model.load_state_dict(torch.load(pretrained_ppl_local_path))
             # pretrained_ppl_model = xm.send_cpu_data_to_device(pretrained_ppl_model, device)
-            # pretrained_ppl_model.to(device)
-            metric_fns.append(functools.partial(gpt_perplexity_batch, ppl_model=pretrained_ppl_model,
-                                                tokenizer=tokenizer, batch_size=PPL_EVAL_BATCH_SIZE,
+            pretrained_ppl_model.to(device)
+            metric_fns.append(functools.partial(gpt_perplexity_batch_280, ppl_model=pretrained_ppl_model,
+                                                tokenizer=tokenizer, device=device, batch_size=PPL_EVAL_BATCH_SIZE,
                                                 block_size=PPL_BLOCK_SIZE))
     else:  # Train and upload ppl model
         tf.compat.v1.logging.warn(

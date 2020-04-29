@@ -3,15 +3,51 @@ import numpy as np
 import t5
 import tensorflow as tf
 import torch
+from torch.utils.data import SequentialSampler
 from torch.nn.utils.rnn import pad_sequence
-from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
+# from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 from transformers.data.processors.utils import InputFeatures
 from torchtext import data
 
 from dataset import MyDataset
 
+def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, styles_origin=None, batch_size=8,
+                             block_size=256):
+  eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
 
-def gpt_perplexity_batch(targets, predictions, ppl_model, tokenizer, styles_origin=None, batch_size=8, block_size=256):
+  def collate(examples):
+    if tokenizer._pad_token is None:
+      return pad_sequence(examples, batch_first=True)
+    return pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id)
+
+  eval_sampler = SequentialSampler(eval_dataset)
+
+  eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=batch_size, collate_fn=collate)
+
+  eval_loss = 0.0
+  nb_eval_steps = 0
+  ppl_model.eval()
+
+  for batch in eval_dataloader:
+    inputs, labels = (batch, batch)
+    inputs = inputs.to(device)
+    labels = labels.to(device)
+
+    with torch.no_grad():
+      outputs = ppl_model(inputs, labels=labels)
+      lm_loss = outputs[0]
+      eval_loss += lm_loss.mean().item()
+    nb_eval_steps += 1
+
+  eval_loss = eval_loss / nb_eval_steps
+  perplexity = torch.exp(torch.tensor(eval_loss))
+
+  return {"perplexity": perplexity}
+
+def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, styles_origin=None, batch_size=8,
+                             block_size=256):
+  # Too early, wait for transformers v2.9.0, otherwise:
+  # ImportError: cannot import name 'DataCollatorForLanguageModeling'
   training_args = TrainingArguments(output_dir="./gpt2_preds", do_eval=True, per_gpu_eval_batch_size=batch_size)
   eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
   data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
