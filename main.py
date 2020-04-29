@@ -577,11 +577,9 @@ def main():
             {"text": "Thank you, you are nice.",
              "Destination style": "Non toxic"},
 
-            {
-                "text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
+            {"text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
                 "Destination style": "Non toxic"},
-            {
-                "text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
+            {"text": "Oh yes, blame Taylor, why the fuck not? It is almost as if her getting groped can also be twisted into something wrong on her part. People like you disturb me , to say the least.",
                 "Destination style": "Toxic"},
 
             {"text": "Donald Trump is best president ever",
@@ -599,11 +597,9 @@ def main():
             {"text": "die, please, you rino s.o.b.",
              "Destination style": "Toxic"},
 
-            {
-                "text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
+            {"text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
                 "Destination style": "Non toxic"},
-            {
-                "text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
+            {"text": "How about FUCK NO. If anything Canada should learn from America's example and start smartening up before this country is overrun by unassimilated immigrants. Why the fuck should Canada have to be the world's global police now that America got tired of doing it? This country has enough problems on its shoulders.",
                 "Destination style": "Toxic"},
 
             {"text": "Nailed Aces fans.  They are not real hockey fans.  Just a bunch of drunk morons.",
@@ -616,18 +612,39 @@ def main():
             {"text": "How about experimenting with fixing our City's infrastructure mainly roads. Idiots.",
              "Destination style": "Toxic"},
 
-            {
-                "text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
+            {"text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
                 "Destination style": "Non toxic"},
-            {
-                "text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
+            {"text": "If there is one thing America, and the world needs is more idiots roaming the back country looking for buried treasure.",
                 "Destination style": "Toxic"},
 
-            {
-                "text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
                 "Destination style": "Non toxic"},
-            {
-                "text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Toxic"},
+
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
+                "Destination style": "Non toxic"},
+            {"text": "More vote pandering to the Gay community Mr. Trudeau? \n\nDo you have any idea how foolish your antics are?",
                 "Destination style": "Toxic"},
         ]
 
