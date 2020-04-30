@@ -442,7 +442,7 @@ def main():
         batch_size=train_batch_size,
         sequence_length=sequence_length,
         learning_rate_schedule=0.003,
-        save_checkpoints_steps=5000,
+        save_checkpoints_steps=2000,
         keep_checkpoint_max=keep_checkpoint_max if ON_CLOUD else None,
         iterations_per_loop=100,
         model_type="bitransformer_ll",
