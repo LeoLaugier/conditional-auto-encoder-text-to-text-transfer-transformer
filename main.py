@@ -718,7 +718,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
-    counter = 201
+    counter = 202
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -752,9 +752,10 @@ if __name__ == "__main__":
         MODELS_DIR_NAME = "models_style_processed_civil_comment_%d" % counter
         DATA_DIR_NAME = "data_style_processed_civil_comment"
 
-        TARGET_PREFIX_STYLE_1 = "Non toxic: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
-        TARGET_PREFIX_STYLE_2 = "Toxic: "  # "Positive: " "Style 2: " imunitar
-        STYLE_IDS = {"Non toxic": "1", "Toxic": "2"}
+        # civil polite courteous respectful
+        TARGET_PREFIX_STYLE_1 = "civil: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
+        TARGET_PREFIX_STYLE_2 = "toxic: "  # "Positive: " "Style 2: " imunitar
+        STYLE_IDS = {"civil": "1", "toxic": "2"}
 
         BALANCE_STYLES = True
         BALANCE_RATE = 90291/5653785
