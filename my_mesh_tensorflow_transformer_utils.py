@@ -955,3 +955,42 @@ def infer_model_ll(estimator,
         checkpoint_path=checkpoint_path,
         input_filename=input_filename,
         output_filename=output_filename)
+
+
+def train_model_ll(estimator, vocabulary, sequence_length, batch_size,
+                train_dataset_fn, train_steps, ensemble_inputs,
+                dataset_split="train"):
+  """Train a Mesh-TF model.
+  Args:
+    estimator: Estimator object, created with the appropriate model_fn.
+    vocabulary: a vocabulary.Vocabulary or (inputs_vocabulary,
+      targets_vocabulary) tuple
+    sequence_length: a dict from feature-key to integer the (packed)
+      sequence length, e.g. {"inputs": 512, "targets": 128}
+    batch_size: an integer, global batch size
+    train_dataset_fn: A function returning a tf.data.Dataset. Should accept the
+     following arguments:
+      - sequence_length: an integer or a dict from feature-key to integer
+        the (packed) sequence length, e.g. {"inputs": 512, "targets": 128}
+      - vocabulary: Vocabulary instance to use for encoding.
+      - dataset_split: str, which dataset split to load.
+    train_steps: an integer, number of steps for training.
+    ensemble_inputs: an optional integer - pass the size of the ensemble to
+      train an ensemble where each model gets different inputs. You also need to
+      configure Unitransformer.ensemble  to the right size. If None, then all
+      models are trained on the same inputs.
+    dataset_split: str, which dataset split to train on.
+  """
+
+  def input_fn(params):
+    del params
+    dataset = train_dataset_fn(
+        sequence_length=sequence_length,
+        vocabulary=vocabulary,
+        dataset_split=dataset_split)
+    dataset = dataset.batch(
+        batch_size * (ensemble_inputs or 1), drop_remainder=True).repeat() # swap batch and repeat to avoid modular problems that eventually causes batches of different styles after some epochs
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
+    return dataset
+
+  estimator.train(input_fn=input_fn, max_steps=train_steps)

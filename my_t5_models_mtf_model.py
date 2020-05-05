@@ -5,7 +5,7 @@ from t5.models.mtf_model import MtfModel
 from t5.models.mtf_model import _get_latest_checkpoint_from_dir, _operative_config_path
 from mesh_tensorflow.transformer import utils
 
-from my_mesh_tensorflow_transformer_utils import eval_model_ll, infer_model_ll
+from my_mesh_tensorflow_transformer_utils import eval_model_ll, infer_model_ll, train_model_ll
 from my_t5_data_utils import get_mixture_or_task_ll
 from my_t5_models_mesh_transformer import mesh_train_dataset_fn_ll, mesh_eval_dataset_fn_ll
 
@@ -13,14 +13,16 @@ from my_t5_models_mesh_transformer import mesh_train_dataset_fn_ll, mesh_eval_da
 @gin.configurable
 class MtfModel_ll(MtfModel):
     def __init__(self, *mtfmodel_args, style_bit=True, unsupervised_style_transfer_metrics=True,
-                 style_dependant_prefix_target=True, style_embedding=False, shift_decoder_output=False,
-                 left_pad_amt_1=0, left_pad_amt_2=0, target_prefix_style_1="", target_prefix_style_2="",
-                 **mtfmodel_kwargs):
+                 style_dependant_prefix_target=True, group_by_style=True, style_embedding=False, style_num=2,
+                 shift_decoder_output=False, left_pad_amt_1=0, left_pad_amt_2=0, target_prefix_style_1="",
+                 target_prefix_style_2="", **mtfmodel_kwargs):
         super().__init__(*mtfmodel_args, **mtfmodel_kwargs)
         self.style_bit = style_bit
         self.unsupervised_style_transfer_metrics = unsupervised_style_transfer_metrics
         self.style_dependant_prefix_target = style_dependant_prefix_target
+        self.group_by_style = group_by_style
         self.style_embedding = style_embedding
+        self.style_num = style_num
         self.shift_decoder_output = shift_decoder_output
         self.left_pad_amt_1 = left_pad_amt_1
         self.left_pad_amt_2 = left_pad_amt_2
@@ -43,11 +45,17 @@ class MtfModel_ll(MtfModel):
             mixture_or_task_name).get_vocabulary()
         dataset_fn = functools.partial(
             mesh_train_dataset_fn_ll, mixture_or_task_name=mixture_or_task_name,
-            batch_size=self.batch_size, ensemble_inputs=self._ensemble_inputs,
-            style_embedding=self.style_embedding,
+            batch_size=self.batch_size, ensemble_inputs=self._ensemble_inputs, group_by_style=self.group_by_style,
+            style_embedding=self.style_embedding, style_num=self.style_num,
             shift_decoder_output=self.shift_decoder_output,
             left_pad_amt_1=self.left_pad_amt_1, left_pad_amt_2=self.left_pad_amt_2)
-        utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
+
+        if self.group_by_style:
+            train_model_ll(self.estimator(vocabulary, init_checkpoint), vocabulary,
+                              self._sequence_length, self.batch_size, dataset_fn,
+                              steps, self._ensemble_inputs, dataset_split=split)
+        else:
+            utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
                           self._sequence_length, self.batch_size, dataset_fn,
                           steps, self._ensemble_inputs, dataset_split=split) # TODO check T5 version
 
