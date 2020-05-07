@@ -129,14 +129,14 @@ def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer,
                     pad_token=pad_token_idx,
                     unk_token=unk_token_idx)
 
-  LABEL = data.LabelField(dtype=torch.float)
+  LABEL = data.LabelField(dtype=torch.float, use_vocab=False)
   fields = [('comment_text', TEXT), ('style_origin', LABEL)]
 
   examples = [data.Example.fromlist([prediction, style_origin], fields)
               for prediction, style_origin in zip(predictions, styles_origin)]
 
   val_data = data.Dataset(examples, fields)
-  LABEL.build_vocab(val_data)
+  # LABEL.build_vocab(val_data) # problem when only one label in val_data or when frequencies of labels are in different order than in the dataset that what used to fine-tune bert_acc_classifier. Solution: use_vocab=False.
   valid_iterator = data.BucketIterator(val_data, batch_size=batch_size, device=device)
 
   epoch_acc = 0
