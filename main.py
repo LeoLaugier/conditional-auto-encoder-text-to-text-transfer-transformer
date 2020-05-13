@@ -483,7 +483,7 @@ def main():
         model.batch_size = train_batch_size * 4
         model.eval(
             mixture_or_task_name=MIXTURE_NAME,
-            checkpoint_steps="all",
+            checkpoint_steps=[1100700], #"all"
             split="test"
         )
 
