@@ -99,12 +99,14 @@ def main():
 
         if DATASET == "processed_CCTK":
             dataset_tsv_path["validation"] = os.path.join(DATA_DIR, "%s-toxic-validation.tsv" % DATASET.lower())
+            dataset_tsv_path["test"] = os.path.join(DATA_DIR, "%s-toxic-test.tsv" % DATASET.lower())
 
         train_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["train"])
         validation_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["validation"])
+        test_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["test"])
 
         # Generating tsv datasets
-        if not train_tsv_exists or not validation_tsv_exists:
+        if not train_tsv_exists or not validation_tsv_exists or not test_tsv_exists:
             tf.compat.v1.logging.info("Generating T5 TSVs.")
             if DATASET == "IMDB":
                 ext0 = "neg"
@@ -128,6 +130,13 @@ def main():
                     raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
                                "",
                                dataset_tsv_path["validation"], mode)
+
+            if not test_tsv_exists:
+                if DATASET == "processed_CCTK":
+                    raw_to_tsv(os.path.join(DATASET_RAW_DIR, "test.%s" % ext1),
+                               "",
+                               dataset_tsv_path["test"], mode)
+
             tf.compat.v1.logging.info("T5 TSVs generated.")
         # Loading datasets
         def tsv_to_dataset_fn(split, shuffle_files=False):
@@ -333,12 +342,11 @@ def main():
     else:
         token_preprocessor = None
 
-    # TODO CCTK task parameters
 
     TaskRegistry_ll.add(
         TASK_NAME,
         *task_cls,
-        splits=["train", "validation"],
+        splits=["train", "validation", "test"],
         # Supply a function which preprocesses text from the tf.data.Dataset.
         text_preprocessor=[text_preprocessor],
         # Use the same vocabulary that we used for pre-training.
@@ -462,20 +470,21 @@ def main():
     with gin.unlock_config():
         gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
 
-    FINETUNE_STEPS = 200000
+    #FINETUNE_STEPS = 200000
 
-    model.finetune(
-        mixture_or_task_name=MIXTURE_NAME,
-        pretrained_model_dir=PRETRAINED_DIR,
-        finetune_steps=FINETUNE_STEPS
-    )
+    #model.finetune(
+    #    mixture_or_task_name=MIXTURE_NAME,
+    #    pretrained_model_dir=PRETRAINED_DIR,
+    #    finetune_steps=FINETUNE_STEPS
+    #)
 
     if EVAL:
         # Use a larger batch size for evaluation, which requires less memory.
         model.batch_size = train_batch_size * 4
         model.eval(
             mixture_or_task_name=MIXTURE_NAME,
-            checkpoint_steps="all"
+            checkpoint_steps="all",
+            split="test"
         )
 
         print_random_predictions(TASK_NAME, sequence_length, MODEL_DIR, n=10)
@@ -818,4 +827,3 @@ if __name__ == "__main__":
                 0.15)]  # [(inputs_fn, noise_density), ...] or None
 
     main()
-    
