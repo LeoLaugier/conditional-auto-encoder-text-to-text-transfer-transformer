@@ -470,21 +470,21 @@ def main():
     with gin.unlock_config():
         gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
 
-    #FINETUNE_STEPS = 200000
+    FINETUNE_STEPS = 100700
 
-    #model.finetune(
-    #    mixture_or_task_name=MIXTURE_NAME,
-    #    pretrained_model_dir=PRETRAINED_DIR,
-    #    finetune_steps=FINETUNE_STEPS
-    #)
+    model.finetune(
+        mixture_or_task_name=MIXTURE_NAME,
+        pretrained_model_dir=PRETRAINED_DIR,
+        finetune_steps=FINETUNE_STEPS
+    )
 
     if EVAL:
         # Use a larger batch size for evaluation, which requires less memory.
         model.batch_size = train_batch_size * 4
         model.eval(
             mixture_or_task_name=MIXTURE_NAME,
-            checkpoint_steps=[1100700], #"all"
-            split="test"
+            checkpoint_steps="all" # [1100700],
+            #split="test"
         )
 
         print_random_predictions(TASK_NAME, sequence_length, MODEL_DIR, n=10)
@@ -729,7 +729,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
-    counter = 202
+    counter = 203
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"

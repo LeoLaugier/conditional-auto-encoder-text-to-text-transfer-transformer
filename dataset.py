@@ -16,13 +16,14 @@ def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
         sentence = sentence.decode("utf-8")
       sentence = sentence.replace("\t", "\\t")
       outfile.write("%s\t%s\n" % (sentence, "1"))
-    sentences_0  = infile_0.readlines()
-    for sentence in sentences_0:
-      sentence = sentence.rstrip()
-      if mode == "rb":
-        sentence = sentence.decode("utf-8")
-      sentence = sentence.replace("\t", "\\t")
-      outfile.write("%s\t%s\n" % (sentence, "0"))
+    if in_fname_0:
+      sentences_0  = infile_0.readlines()
+      for sentence in sentences_0:
+        sentence = sentence.rstrip()
+        if mode == "rb":
+          sentence = sentence.decode("utf-8")
+        sentence = sentence.replace("\t", "\\t")
+        outfile.write("%s\t%s\n" % (sentence, "0"))
 
 
 def st_preprocessor(ds, dataset=None, style_bit=False,
