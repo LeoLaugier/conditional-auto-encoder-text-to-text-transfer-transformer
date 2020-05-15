@@ -103,7 +103,10 @@ def main():
 
         train_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["train"])
         validation_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["validation"])
-        test_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["test"])
+        if DATASET == "processed_CCTK":
+            test_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["test"])
+        else:
+            test_tsv_exists = True
 
         # Generating tsv datasets
         if not train_tsv_exists or not validation_tsv_exists or not test_tsv_exists:
@@ -342,6 +345,10 @@ def main():
     else:
         token_preprocessor = None
 
+    if DATASET == "processed_CCTK":
+        splits = ["train", "validation", "test"]
+    else:
+        splits = ["train", "validation"]
 
     TaskRegistry_ll.add(
         TASK_NAME,
