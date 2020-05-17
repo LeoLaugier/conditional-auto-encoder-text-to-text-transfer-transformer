@@ -91,7 +91,7 @@ def main():
     task_cls = []
     task_kwargs = {}
     ## Generating and / or loading datasets
-    if DATASET == "IMDB" or DATASET == "processed_CCTK":
+    if DATASET == "IMDB" or DATASET == "YELP" or DATASET == "processed_CCTK":
         dataset_tsv_path = {
             "train": os.path.join(DATA_DIR, "%s-train.tsv" % DATASET.lower()),
             "validation": os.path.join(DATA_DIR, "%s-validation.tsv" % DATASET.lower())
@@ -101,9 +101,12 @@ def main():
             dataset_tsv_path["validation"] = os.path.join(DATA_DIR, "%s-toxic-validation.tsv" % DATASET.lower())
             dataset_tsv_path["test"] = os.path.join(DATA_DIR, "%s-toxic-test.tsv" % DATASET.lower())
 
+        if DATASET == "YELP":
+            dataset_tsv_path["test"] = os.path.join(DATA_DIR, "%s-test.tsv" % DATASET.lower())
+
         train_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["train"])
         validation_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["validation"])
-        if DATASET == "processed_CCTK":
+        if DATASET == "processed_CCTK" or DATASET == "YELP":
             test_tsv_exists = tf.io.gfile.exists(dataset_tsv_path["test"])
         else:
             test_tsv_exists = True
@@ -111,7 +114,7 @@ def main():
         # Generating tsv datasets
         if not train_tsv_exists or not validation_tsv_exists or not test_tsv_exists:
             tf.compat.v1.logging.info("Generating T5 TSVs.")
-            if DATASET == "IMDB":
+            if DATASET == "IMDB" or DATASET == "YELP":
                 ext0 = "neg"
                 ext1 = "pos"
                 mode ="rb"
@@ -125,7 +128,7 @@ def main():
                            os.path.join(DATASET_RAW_DIR, "train.%s" % ext0),
                            dataset_tsv_path["train"], mode)
             if not validation_tsv_exists:
-                if DATASET == "IMDB":
+                if DATASET == "IMDB" or DATASET == "YELP":
                     raw_to_tsv(os.path.join(DATASET_RAW_DIR, "dev.%s" % ext1),
                                os.path.join(DATASET_RAW_DIR, "dev.%s" % ext0),
                                dataset_tsv_path["validation"], mode)
@@ -135,7 +138,7 @@ def main():
                                dataset_tsv_path["validation"], mode)
 
             if not test_tsv_exists:
-                if DATASET == "processed_CCTK":
+                if DATASET == "processed_CCTK" or DATASET == "YELP":
                     raw_to_tsv(os.path.join(DATASET_RAW_DIR, "test.%s" % ext1),
                                "",
                                dataset_tsv_path["test"], mode)
@@ -189,6 +192,8 @@ def main():
     if PPL_ARCHITECTURE == "gpt2":
         if DATASET == "processed_CCTK":
             pretrained_ppl_filename = 'gpt2_%s_%s.pt' % ("ppl", "CCTK".lower())
+        elif DATASET == "YELP":
+            pretrained_ppl_filename = 'gpt2_%s_%s.pt' % ("ppl", "YELP".lower())
     pretrained_ppl_local_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
     pretrained_ppl_gcs_path = os.path.join('ppl_binaries', pretrained_ppl_filename)
 
@@ -353,7 +358,7 @@ def main():
     TaskRegistry_ll.add(
         TASK_NAME,
         *task_cls,
-        splits=["train", "validation", "test"],
+        splits=splits,
         # Supply a function which preprocesses text from the tf.data.Dataset.
         text_preprocessor=[text_preprocessor],
         # Use the same vocabulary that we used for pre-training.
@@ -370,12 +375,12 @@ def main():
 
     # Load and print a few examples.
     st_task = TaskRegistry_ll.get(TASK_NAME)
-    sequence_length = {"inputs": 128, "targets": 128}
+    sequence_length = {"inputs": 32, "targets": 32}
     if STYLE_BIT:
-        sequence_length["style"] = 128  # Or "style": 1 but packing not efficient...
+        sequence_length["style"] = 32  # Or "style": 1 but packing not efficient...
     if STYLE_DEPENDANT_PREFIX_TARGET:
-        sequence_length["codeprefixedtargets"] = 128
-        sequence_length["codeprefix"] = 128
+        sequence_length["codeprefixedtargets"] = 32
+        sequence_length["codeprefix"] = 32
 
     ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
 
@@ -435,12 +440,12 @@ def main():
 
     tf.io.gfile.makedirs(MODEL_DIR)
 
-    sequence_length = {"inputs": 128, "targets": 128}
+    sequence_length = {"inputs": 32, "targets": 32}
     if STYLE_BIT:
-        sequence_length["style"] = 128
+        sequence_length["style"] = 32
     if STYLE_DEPENDANT_PREFIX_TARGET:
-        sequence_length["codeprefixedtargets"] = 128
-        sequence_length["codeprefix"] = 128
+        sequence_length["codeprefixedtargets"] = 32
+        sequence_length["codeprefix"] = 32
 
     # Ou alors, based on L. 357-362  https://github.com/tensorflow/mesh/blob/a719398c92a48990921e57608ef99553ad1b1a85/mesh_tensorflow/transformer/utils.py#L357
     # ignore et appeler le feature style "input_style" (dans ce cas length of style = 128)
@@ -477,7 +482,7 @@ def main():
     with gin.unlock_config():
         gin.parse_config_file("gs://test-t5/unitransformer_ll.gin")
 
-    FINETUNE_STEPS = 100700
+    FINETUNE_STEPS = 200000
 
     model.finetune(
         mixture_or_task_name=MIXTURE_NAME,
@@ -735,8 +740,8 @@ if __name__ == "__main__":
     BALANCE_RATE = 0
 
     # Task / dataset
-    DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
-    counter = 203
+    DATASET = "yelp"  # CCTK or IMDB or processed_civil_comments
+    counter = 100
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -748,6 +753,18 @@ if __name__ == "__main__":
         STYLE_IDS = {"Negative": "1", "Positive": "2"}
 
         DATASET_RAW_DIR = "gs://test-t5/imdb_processed"
+
+    elif DATASET == "YELP":
+        TASK_NAME = "st_yelp"
+        MIXTURE_NAME = "st_yelp_mixture"
+        MODELS_DIR_NAME = "models_style_yelp_%d" % counter
+        DATA_DIR_NAME = "data_style_yelp"
+
+        TARGET_PREFIX_STYLE_1 = "Negative: "  # "Negative: " # Maybe more complex like "Said in a negative manner, " "Style 1: "  erwachsene
+        TARGET_PREFIX_STYLE_2 = "Positive: "  # "Positive: " "Style 2: " imunitar
+        STYLE_IDS = {"Negative": "1", "Positive": "2"}
+
+        DATASET_RAW_DIR = "gs://test-t5/yelp_processed"
 
     elif DATASET == "CCTK":
         TASK_NAME = "st_toxic_comments"
