@@ -740,7 +740,7 @@ if __name__ == "__main__":
     BALANCE_RATE = 0
 
     # Task / dataset
-    DATASET = "yelp"  # CCTK or IMDB or processed_civil_comments
+    DATASET = "YELP"  # CCTK or IMDB or processed_civil_comments
     counter = 100
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"

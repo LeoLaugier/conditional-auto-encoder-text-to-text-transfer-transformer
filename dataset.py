@@ -44,7 +44,7 @@ def st_preprocessor(ds, dataset=None, style_bit=False,
         {"inputs": ..., ["style": ..., "codeprefixedtargets": ..., "codeprefix": ...,] "targets": ...}.
     """
     style = None
-    if dataset == "IMDB" or dataset == "processed_CCTK":
+    if dataset == "IMDB" or dataset == "YELP" or dataset == "processed_CCTK":
       style = tf.strings.to_number(ex["style"], tf.int32)
     elif dataset == "CCTK":
       style = tf.dtypes.cast(tf.round(ex["toxicity"]), tf.int32)
