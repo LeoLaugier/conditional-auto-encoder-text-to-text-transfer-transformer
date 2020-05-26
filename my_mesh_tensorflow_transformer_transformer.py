@@ -54,8 +54,12 @@ def make_bitransformer_ll(
         style_embedding=style_embedding_encoder,
         style_num=style_num)
   with gin.config_scope("decoder"):
+    if cut_cross_attention:
+        layer_stack = make_layer_stack(layers=[mtf.transformer.transformer_layers.SelfAttention, [mtf.transformer.transformer_layers.DenseReluDense, "layer_002"]])
+    else:
+        layer_stack = make_layer_stack()
     decoder = Unitransformer_ll(
-        layer_stack=make_layer_stack(layers=[mtf.transformer.transformer_layers.SelfAttention, [mtf.transformer.transformer_layers.DenseReluDense, "layer_002"]]), # TOCLEAN layer_stack=make_layer_stack()
+        layer_stack=layer_stack, # TOCLEAN layer_stack=make_layer_stack()
         input_vocab_size=output_vocab_size,
         output_vocab_size=output_vocab_size,
         autoregressive=True,

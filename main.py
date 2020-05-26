@@ -350,7 +350,7 @@ def main():
     else:
         token_preprocessor = None
 
-    if DATASET == "processed_CCTK":
+    if DATASET == "processed_CCTK" or DATASET == "YELP":
         splits = ["train", "validation", "test"]
     else:
         splits = ["train", "validation"]
