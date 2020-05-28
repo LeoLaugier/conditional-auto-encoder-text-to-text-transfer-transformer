@@ -375,12 +375,12 @@ def main():
 
     # Load and print a few examples.
     st_task = TaskRegistry_ll.get(TASK_NAME)
-    sequence_length = {"inputs": 32, "targets": 32}
+    sequence_length = {"inputs": 64, "targets": 64}
     if STYLE_BIT:
-        sequence_length["style"] = 32  # Or "style": 1 but packing not efficient...
+        sequence_length["style"] = 64  # Or "style": 1 but packing not efficient...
     if STYLE_DEPENDANT_PREFIX_TARGET:
-        sequence_length["codeprefixedtargets"] = 32
-        sequence_length["codeprefix"] = 32
+        sequence_length["codeprefixedtargets"] = 64
+        sequence_length["codeprefix"] = 64
 
     ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
 
@@ -440,12 +440,12 @@ def main():
 
     tf.io.gfile.makedirs(MODEL_DIR)
 
-    sequence_length = {"inputs": 32, "targets": 32}
+    sequence_length = {"inputs": 64, "targets": 64}
     if STYLE_BIT:
-        sequence_length["style"] = 32
+        sequence_length["style"] = 64
     if STYLE_DEPENDANT_PREFIX_TARGET:
-        sequence_length["codeprefixedtargets"] = 32
-        sequence_length["codeprefix"] = 32
+        sequence_length["codeprefixedtargets"] = 64
+        sequence_length["codeprefix"] = 64
 
     # Ou alors, based on L. 357-362  https://github.com/tensorflow/mesh/blob/a719398c92a48990921e57608ef99553ad1b1a85/mesh_tensorflow/transformer/utils.py#L357
     # ignore et appeler le feature style "input_style" (dans ce cas length of style = 128)
@@ -740,8 +740,8 @@ if __name__ == "__main__":
     BALANCE_RATE = 0
 
     # Task / dataset
-    DATASET = "YELP"  # CCTK or IMDB or processed_civil_comments
-    counter = 100
+    DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
+    counter = 209
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -806,10 +806,10 @@ if __name__ == "__main__":
     SHIFT_DECODER_OUTPUT = True
 
     # SummAE-like Encoder-Decoder
-    CUT_CROSS_ATTENTION = True
+    CUT_CROSS_ATTENTION = False
 
     # Cycle-Consistency loss
-    CYCLE_CONSISTENCY_LOSS = True
+    CYCLE_CONSISTENCY_LOSS = False
     LAMBDA_AE = 1.0
     LAMBDA_CYCLE = 1.0
 
