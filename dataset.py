@@ -7,15 +7,16 @@ def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
   with tf.io.gfile.GFile(in_fname_1, mode) as infile_1,\
        tf.io.gfile.GFile(in_fname_0, mode) as infile_0,\
        tf.io.gfile.GFile(out_fname, "w") as outfile:
-    sentences_1  = infile_1.readlines()
-    for sentence in sentences_1:
-      sentence = sentence.rstrip()
-      # sentence = sentence.decode("utf-8")
-      # outfile.write(sentence+"\t"+"1\n")
-      if mode == "rb":
-        sentence = sentence.decode("utf-8")
-      sentence = sentence.replace("\t", "\\t")
-      outfile.write("%s\t%s\n" % (sentence, "1"))
+    if in_fname_1:
+      sentences_1  = infile_1.readlines()
+      for sentence in sentences_1:
+        sentence = sentence.rstrip()
+        # sentence = sentence.decode("utf-8")
+        # outfile.write(sentence+"\t"+"1\n")
+        if mode == "rb":
+          sentence = sentence.decode("utf-8")
+        sentence = sentence.replace("\t", "\\t")
+        outfile.write("%s\t%s\n" % (sentence, "1"))
     if in_fname_0:
       sentences_0  = infile_0.readlines()
       for sentence in sentences_0:

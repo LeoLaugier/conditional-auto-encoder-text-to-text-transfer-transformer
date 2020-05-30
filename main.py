@@ -741,7 +741,7 @@ if __name__ == "__main__":
 
     # Task / dataset
     DATASET = "processed_CCTK"  # CCTK or IMDB or processed_civil_comments
-    counter = 209
+    counter = 210
     if DATASET == "IMDB":
         TASK_NAME = "st_imdb"
         MIXTURE_NAME = "st_imdb_mixture"
@@ -806,10 +806,10 @@ if __name__ == "__main__":
     SHIFT_DECODER_OUTPUT = True
 
     # SummAE-like Encoder-Decoder
-    CUT_CROSS_ATTENTION = False
+    CUT_CROSS_ATTENTION = True
 
     # Cycle-Consistency loss
-    CYCLE_CONSISTENCY_LOSS = False
+    CYCLE_CONSISTENCY_LOSS = True
     LAMBDA_AE = 1.0
     LAMBDA_CYCLE = 1.0
 
@@ -848,6 +848,6 @@ if __name__ == "__main__":
     USE_TPU = True
 
     DENOISE = [(t5.data.preprocessors.noise_token_to_random_token_or_sentinel,
-                0.15)]  # [(inputs_fn, noise_density), ...] or None
+                0.15), (t5.data.preprocessors.permute_noise_tokens, 1.0)]  # [(inputs_fn, noise_density), ...] or None
 
     main()
