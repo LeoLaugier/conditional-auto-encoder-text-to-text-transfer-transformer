@@ -193,7 +193,7 @@ class Unitransformer_ll(Unitransformer):
                 sty_emb_var, styles, self.style_dim,
                 output_shape=x.shape)
             # Addition of x and style
-            # x *= LAMBDA_STYLE * sty_emb # TODO make sure that sty_emb [batch_size] sums well with x [batch_size x max_length]
+            # x *= LAMBDA_STYLE * sty_emb #
 
             # Concatenation of x and style
             x_style = mtf.concat([x, sty_emb], self.model_dim.name)
@@ -424,7 +424,7 @@ class Unitransformer_ll(Unitransformer):
         shifted_inputs = mtf.shift(inputs, offset=1, dim=length_dim, wrap=False)
         with tf.variable_scope(self.name):
             logits = self._call_internal(context_first_part, shifted_inputs, styles=styles,
-                                         z=z)  # TODO Check that adding the (embedded) style to all inputs (rather than only relevant tokens that are not eos/bos/pad tokens) doesn't cause unexpected behavior...
+                                         z=z)
         del logits
         constant_states = context_first_part.constant_states
         if not has_partial_sequences:
@@ -485,7 +485,7 @@ class Unitransformer_ll(Unitransformer):
 
             with tf.variable_scope(self.name, reuse=True):
                 logits = self._call_internal(context_incremental, inputs_this_step, styles=styles_this_step,
-                                             z=z)  # TODO Check the addition of the (embedded) style is correct.
+                                             z=z)
                 if never_end:
                     logits += mtf.one_hot(
                         mtf.constant(logits.mesh, stop_at_token, dtype=tf.int32),
@@ -541,7 +541,7 @@ class Unitransformer_ll(Unitransformer):
         """Beam search.
         Args:
           inputs: an int32 zero-Tensor with shape [<batch_dims>, beam_dim,
-            length_dim].# TODO Check that adding the (embedded) style to all inputs (rather than only relevant tokens that are not eos/bos/pad tokens) doesn't cause unexpected behavior...
+            length_dim].#
           decode_length: an int32 mtf scalar.  Maximum decode length.
           styles: an int32 zero-Tensor with shape [<batch_dims>, beam_dim, length_dim]
                                           ([<batch_dims>]
@@ -606,7 +606,7 @@ class Unitransformer_ll(Unitransformer):
         shifted_inputs = mtf.shift(inputs, offset=1, dim=length_dim, wrap=False)
         with tf.variable_scope(self.name):
             logits = self._call_internal(context_first_part, shifted_inputs, styles=styles,
-                                         z=z)  # TODO Check the addition of the (embedded) style is correct.
+                                         z=z)
         del logits
         # There are no partial targets.
         # Replace initial states by zeros to avoid computing them.
@@ -644,7 +644,7 @@ class Unitransformer_ll(Unitransformer):
                 encoder_inputs=encoder_inputs)
             with tf.variable_scope(self.name, reuse=True):
                 logits = self._call_internal(context_incremental, inputs_this_step, styles=styles_this_step,
-                                             z=z)  # TODO Check the addition of the (embedded) style is correct.
+                                             z=z)
             return mtf.to_float(logits), context_incremental.new_states
 
         beams, unused_scores = mtf.beam_search.beam_search(
@@ -773,7 +773,7 @@ class Bitransformer_ll(Bitransformer):
             sequence_id=encoder_sequence_id,
             position=encoder_position,
             shared_params=shared_params,
-            layer_outputs=encoder_layer_outputs)  # TODO Later: optionnaly add (embedded) style to the encoder's inputs
+            layer_outputs=encoder_layer_outputs)
         encoder_output = mtf.layers.rename_length_to_memory_length(encoder_output)
         if encoder_sequence_id is not None:
             encoder_sequence_id = mtf.layers.rename_length_to_memory_length(

@@ -369,7 +369,7 @@ def tpu_estimator_model_fn_ll(model_type,
                 )
             elif isinstance(
                     transformer_model,
-                    transformer.Bitransformer) or model_type == "bi_student_teacher": # TODO add Bitransformer_ll even if a Bitransformer_ll is Bitransformer...
+                    transformer.Bitransformer) or model_type == "bi_student_teacher":
                 if style_dependant_prefix_target:
                     position_kwargs = dict(
                         encoder_sequence_id=mtf_features.get("inputs_segmentation", None),
@@ -393,7 +393,7 @@ def tpu_estimator_model_fn_ll(model_type,
             else:
                 raise ValueError("unrecognized class")
 
-            if isinstance(transformer_model, Bitransformer_ll): # TODO clean with *args and **kwargs?
+            if isinstance(transformer_model, Bitransformer_ll):
                 if cycle_consistency_loss:
                     logits_ae, l_ae = transformer_model.call_simple(
                         inputs=inputs,

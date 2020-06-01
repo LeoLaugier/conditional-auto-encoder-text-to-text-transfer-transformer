@@ -36,7 +36,7 @@ def st_preprocessor(ds, dataset=None, style_bit=False,
     text = tf.strings.regex_replace(text, br"\\n", b"\n")
     text = tf.strings.regex_replace(text, br"\\t", b"\n")
     # text = tf.strings.regex_replace(text,"'(.*)'", r"\1")
-    # TODO: add cleaning methods suitable for "dirty" comments. Maybe perspective has it? Or SentencePiece already does it.
+
     return text
 
   def to_inputs_and_targets(ex):

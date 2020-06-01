@@ -57,7 +57,7 @@ class MtfModel_ll(MtfModel):
         else:
             utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
                           self._sequence_length, self.batch_size, dataset_fn,
-                          steps, self._ensemble_inputs, dataset_split=split) # TODO check T5 version
+                          steps, self._ensemble_inputs, dataset_split=split)
 
     def eval(self, mixture_or_task_name, checkpoint_steps=None, summary_dir=None,
              split="validation"):

@@ -66,14 +66,14 @@ def mesh_train_dataset_fn_ll(
             ensure_eos=True,
             shift_decoder_output=shift_decoder_output,
             left_pad_amt_1=left_pad_amt_1,
-            left_pad_amt_2=left_pad_amt_2)  # TODO (not straightforward) Adapt packing so that pack=True
+            left_pad_amt_2=left_pad_amt_2)  # (not straightforward) Adapt packing so that pack=True
         ds2_style_2 = pack_or_pad_ll(
             ds_style_2, sequence_length, pack=False,
             feature_keys=tuple(mixture_or_task.output_features),
             ensure_eos=True,
             shift_decoder_output=shift_decoder_output,
             left_pad_amt_1=left_pad_amt_1,
-            left_pad_amt_2=left_pad_amt_2)  # TODO (not straightforward) Adapt packing so that pack=True
+            left_pad_amt_2=left_pad_amt_2)  # (not straightforward) Adapt packing so that pack=True
 
         if style_embedding:
             ds3_style_1 = process_style(ds2_style_1, mode="eval")

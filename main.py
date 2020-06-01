@@ -241,7 +241,7 @@ def main():
             tf.compat.v1.logging.info(
                 "Pre-trained fasttext binary not found on bucket, we will pre-train a fasttext style classifier")
 
-            # TODO Adapt to CCTK because "train.pos" et "train.neg" n'existent pas dans CCTK
+
             if DATASET == "IMDB":
                 fasttext_input_gcs_path = {
                     "train": os.path.join(DATA_DIR, "%s_fasttext_input.train" % DATASET.lower()),
@@ -395,7 +395,7 @@ def main():
     )
 
 
-    # TODO Unittests about preprocessing dataset
+
 
     # Modified T5 "style-aware denoising autoencoder (pre-trained) bi-transformer"
     utils.build_model = functools.partial(build_model_ll ,
@@ -726,7 +726,7 @@ if __name__ == "__main__":
     STYLE_EMBEDDING_DECODER = False
     STYLE_EMBEDDING = STYLE_EMBEDDING_ENCODER or STYLE_EMBEDDING_DECODER
     STYLE_BIT = True
-    STYLE_NUM = 2  # TODO 2 styles at the beggining but we can add more styles in gin file.
+    STYLE_NUM = 2
     LAMBDA_STYLE = 1  # 10 not enough (?) # 100
 
     STYLE_DEPENDANT_PREFIX_INPUT = False
