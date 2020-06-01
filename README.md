@@ -1,4 +1,4 @@
-T5_style_transfer
+Code for CAE-T5
 
 Requirements: 
 * tensorflow==1.15.0
@@ -9,4 +9,6 @@ Requirements:
 * tfds-nightly>=1.3.2.dev201912070105,<2.1.0.dev202003190105
 * fasttext==0.9.2
 * google-api-python-client==1.7.12 
+
+To run on TPU: python main.py
 
