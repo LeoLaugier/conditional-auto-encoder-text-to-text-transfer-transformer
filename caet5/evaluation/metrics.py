@@ -9,9 +9,9 @@ from torch.nn.utils.rnn import pad_sequence
 from transformers.data.processors.utils import InputFeatures
 from torchtext import data
 
-from dataset import MyDataset
+from caet5.data.dataset import MyDataset
 
-def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, styles_origin=None, batch_size=8,
+def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, attributes_origin=None, batch_size=8,
                              block_size=256):
   eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
 
@@ -44,7 +44,7 @@ def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device,
 
   return {"perplexity": perplexity}
 
-def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, styles_origin=None, batch_size=8,
+def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, attributes_origin=None, batch_size=8,
                              block_size=256):
   # Too early, wait for transformers v2.9.0, otherwise:
   # ImportError: cannot import name 'DataCollatorForLanguageModeling'
@@ -67,7 +67,7 @@ def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, styles_
   return {"perplexity": perplexity}
 
 
-def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, styles_origin=None):
+def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, attributes_origin=None):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,
                                                 max_length=tokenizer.max_len)["input_ids"]
   all_input_ids = [torch.tensor(example, dtype=torch.long) for example in examples]
@@ -91,7 +91,7 @@ def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, styles_or
   return {"perplexity": perplexity}
 
 
-def kenlm_perplexity(targets, predictions, ppl_model, styles_origin=None):
+def kenlm_perplexity(targets, predictions, ppl_model, attributes_origin=None):
   sum_ppl_scores = 0
   length = 0
 
@@ -105,8 +105,8 @@ def kenlm_perplexity(targets, predictions, ppl_model, styles_origin=None):
   return {"perplexity": perplexity}
 
 
-def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, styles_origin=None,
-                              batch_size=32):
+def bert_attribute_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None,
+                                  batch_size=32):
   # torchtext dataset
   init_token_idx = tokenizer.cls_token_id
   eos_token_idx = tokenizer.sep_token_id
@@ -130,10 +130,10 @@ def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer,
                     unk_token=unk_token_idx)
 
   LABEL = data.LabelField(dtype=torch.float, use_vocab=False)
-  fields = [('comment_text', TEXT), ('style_origin', LABEL)]
+  fields = [('comment_text', TEXT), ('attribute_origin', LABEL)]
 
-  examples = [data.Example.fromlist([prediction, style_origin], fields)
-              for prediction, style_origin in zip(predictions, styles_origin)]
+  examples = [data.Example.fromlist([prediction, attribute_origin], fields)
+              for prediction, attribute_origin in zip(predictions, attributes_origin)]
 
   val_data = data.Dataset(examples, fields)
   # LABEL.build_vocab(val_data) # problem when only one label in val_data or when frequencies of labels are in different order than in the dataset that what used to fine-tune bert_acc_classifier. Solution: use_vocab=False.
@@ -146,14 +146,14 @@ def bert_style_accuracy_batch(targets, predictions, classifier_model, tokenizer,
   with torch.no_grad():
     for batch in valid_iterator:
       prediction_labels = torch.round(torch.sigmoid(classifier_model(batch.comment_text)[0].squeeze(1)))
-      correct = (prediction_labels != batch.style_origin).float()
+      correct = (prediction_labels != batch.attribute_origin).float()
       acc = correct.sum() / len(correct)
       epoch_acc += acc.item()
 
-  return {"style_accuracy": epoch_acc / len(valid_iterator)}
+  return {"attribute_accuracy": epoch_acc / len(valid_iterator)}
 
 
-def bert_style_accuracy(targets, predictions, classifier_model, tokenizer, device, styles_origin=None, batch_size=32):
+def bert_attribute_accuracy(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None, batch_size=32):
   batch_encoding = tokenizer.batch_encode_plus(predictions, max_length=tokenizer.max_len, pad_to_max_length=True)
 
   features = []
@@ -180,33 +180,33 @@ def bert_style_accuracy(targets, predictions, classifier_model, tokenizer, devic
 
   prediction_labels = prediction_labels.detach().cpu().numpy()
 
-  styles_origin = np.array(styles_origin)
+  attributes_origin = np.array(attributes_origin)
 
-  correct = (prediction_labels != styles_origin).float()
+  correct = (prediction_labels != attributes_origin).float()
 
-  style_accuracy = correct.sum() / len(correct)
+  attribute_accuracy = correct.sum() / len(correct)
 
-  return {"style_accuracy": style_accuracy}
+  return {"attribute_accuracy": attribute_accuracy}
 
 
-def fasttext_style_accuracy(targets, predictions, classifier_model, styles_origin=None):
+def fasttext_attribute_accuracy(targets, predictions, classifier_model, attributes_origin=None):
   count = 0
-  assert len(predictions) == len(styles_origin), "The sizes of predictions and styles_origin don't match"
-  for prediction, style_origin in zip(predictions, styles_origin):
+  assert len(predictions) == len(attributes_origin), "The sizes of predictions and attributes_origin don't match"
+  for prediction, attribute_origin in zip(predictions, attributes_origin):
     prediction_label = classifier_model.predict([prediction])[0][0][0][-1]
-    if prediction_label != style_origin:
+    if prediction_label != attribute_origin:
       count += 1
 
-  style_accuracy = count / len(predictions)
+  attribute_accuracy = count / len(predictions)
 
-  return {"style_accuracy": style_accuracy}
+  return {"attribute_accuracy": attribute_accuracy}
 
 
-def our_bleu(targets, predictions, styles_origin=None):
+def bleu(targets, predictions, attributes_origin=None):
   return t5.evaluation.metrics.bleu(targets, predictions)
 
 
-def sentence_similarity(targets, predictions, sentence_similarity_model, styles_origin=None):
+def sentence_similarity(targets, predictions, sentence_similarity_model, attributes_origin=None):
   with tf.Session() as session:
     session.run([tf.global_variables_initializer(), tf.tables_initializer()])
     targets_embeddings = session.run(sentence_similarity_model(targets))

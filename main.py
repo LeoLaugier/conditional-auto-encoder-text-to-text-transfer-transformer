@@ -25,15 +25,15 @@ import t5.data.sentencepiece_vocabulary as sentencepiece_processor
 from googleapiclient.discovery import build
 import tensorflow_hub as hub
 
-from automatic_metrics.automatic_metrics import our_bleu, kenlm_perplexity, sentence_similarity, \
-    fasttext_style_accuracy, gpt_perplexity_batch_280, bert_style_accuracy_batch
-from dataset import raw_to_tsv, st_preprocessor, raw_to_fasttext_input
+from caet5.evaluation.metrics import bleu, kenlm_perplexity, sentence_similarity, \
+    fasttext_attribute_accuracy, gpt_perplexity_batch_280, bert_attribute_accuracy_batch
+from caet5.data.dataset import raw_to_tsv, at_preprocessor, raw_to_fasttext_input
 from eval import print_random_predictions
 from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
 from my_mesh_tensorflow_transformer_utils import build_model_ll, tpu_estimator_model_fn_ll
-from my_t5_data_preprocessors import denoise_ll
-from my_t5_data_utils import TaskRegistry_ll, MixtureRegistry_ll, TfdsTask_ll
-from my_utils import download_from_bucket_to_local, upload_blob
+from caet5.data.preprocessors import denoise
+from caet5.data.utils import TaskRegistry_ll, MixtureRegistry_ll, TfdsTask_ll
+from caet5.evaluation.metrics_utils import download_from_bucket_to_local, upload_blob
 from my_t5_models_mtf_model import MtfModel_ll
 
 
@@ -156,7 +156,7 @@ def main():
                                   field_delim="\t", use_quote_delim=False),
                 num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-            ds = ds.map(lambda *ex: dict(zip(["text", "style"], ex)))
+            ds = ds.map(lambda *ex: dict(zip(["text", "attribute"], ex)))
             return ds
 
         print("A few raw validation examples...")
@@ -179,12 +179,12 @@ def main():
             print(ex)
 
         task_kwargs = {"tfds_name": "civil_comments:0.9.0", "tfds_data_dir": DATA_DIR,
-                       "balance_styles": BALANCE_STYLES, "balance_rate": BALANCE_RATE}
+                       "balance_attributes": BALANCE_attributeS, "balance_rate": BALANCE_RATE}
         task_cls = [TfdsTask_ll]
 
 
     ### Metrics
-    metric_fns = [our_bleu]
+    metric_fns = [bleu]
     gcs_service = build('storage', 'v1')
 
     ## Perplexity
@@ -220,7 +220,7 @@ def main():
     else:  # Train and upload ppl model
         tf.compat.v1.logging.warn(
             "Pre-trained perplexity model not found neither on local nor on bucket."
-            "If you want a perplexity metric, please pre-train a perplexity language model with KenLM."
+            "If you want a perplexity metric_name, please pre-train a perplexity language model with KenLM."
             "Instructions here: https://kheafield.com/code/kenlm/"
         )
 
@@ -239,7 +239,7 @@ def main():
 
         else:
             tf.compat.v1.logging.info(
-                "Pre-trained fasttext binary not found on bucket, we will pre-train a fasttext style classifier")
+                "Pre-trained fasttext binary not found on bucket, we will pre-train a fasttext attribute classifier")
 
 
             if DATASET == "IMDB":
@@ -307,7 +307,7 @@ def main():
 
     if ACC_ARCHITECTURE == "fasttext":
         pretrained_acc_model = fasttext.load_model(pretrained_acc_local_path)
-        metric_fns.append(functools.partial(fasttext_style_accuracy, classifier_model=pretrained_acc_model))
+        metric_fns.append(functools.partial(fasttext_attribute_accuracy, classifier_model=pretrained_acc_model))
     elif ACC_ARCHITECTURE == "BERT":
         device = "cpu" # xm.xla_device()
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
@@ -316,7 +316,7 @@ def main():
         pretrained_acc_model.load_state_dict(torch.load(pretrained_acc_local_path, map_location=torch.device('cpu')))
         # pretrained_acc_model = xm.send_cpu_data_to_device(pretrained_acc_model, device)
         pretrained_acc_model.to(device)
-        metric_fns.append(functools.partial(bert_style_accuracy_batch, classifier_model=pretrained_acc_model,
+        metric_fns.append(functools.partial(bert_attribute_accuracy_batch, classifier_model=pretrained_acc_model,
                                             tokenizer=tokenizer, device=device, batch_size=ACC_EVAL_BATCH_SIZE))
 
     ## Similarity
@@ -327,23 +327,23 @@ def main():
 
 
     output_features = ["inputs", "targets"]
-    if STYLE_BIT:
-        output_features.append("style")
+    if attribute_BIT:
+        output_features.append("attribute")
 
-    if STYLE_DEPENDANT_PREFIX_TARGET:
+    if attribute_DEPENDANT_PREFIX_TARGET:
         output_features.append("codeprefixedtargets")
-        output_features.append("codeprefix")
+        output_features.append("controlcode")
 
-    text_preprocessor = functools.partial(st_preprocessor, dataset=DATASET, style_bit=STYLE_BIT,
-                    style_dependant_prefix_input=STYLE_DEPENDANT_PREFIX_INPUT,
-                    input_prefix_style_1=INPUT_PREFIX_STYLE_1, input_prefix_style_2=INPUT_PREFIX_STYLE_2,
-                    style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
-                    target_prefix_style_1=TARGET_PREFIX_STYLE_1, target_prefix_style_2=TARGET_PREFIX_STYLE_2)
+    text_preprocessor = functools.partial(at_preprocessor, dataset=DATASET, attribute_bit=attribute_BIT,
+                                          attribute_dependant_prefix_input=attribute_DEPENDANT_PREFIX_INPUT,
+                                          input_prefix_attribute_1=INPUT_PREFIX_attribute_1, input_prefix_attribute_2=INPUT_PREFIX_attribute_2,
+                                          attribute_dependant_prefix_target=attribute_DEPENDANT_PREFIX_TARGET,
+                                          target_prefix_attribute_1=TARGET_PREFIX_attribute_1, target_prefix_attribute_2=TARGET_PREFIX_attribute_2)
 
     if DENOISE:
         token_preprocessor = []
         for inputs_fn, noise_density in DENOISE:
-            token_preprocessor.append(functools.partial(denoise_ll, noise_density=noise_density,
+            token_preprocessor.append(functools.partial(denoise, noise_density=noise_density,
                                                         noise_mask_fn=t5.data.preprocessors.iid_noise_mask,
                                                         inputs_fn=inputs_fn,
                                                         targets_fn=None))
@@ -376,11 +376,11 @@ def main():
     # Load and print a few examples.
     st_task = TaskRegistry_ll.get(TASK_NAME)
     sequence_length = {"inputs": 64, "targets": 64}
-    if STYLE_BIT:
-        sequence_length["style"] = 64  # Or "style": 1 but packing not efficient...
-    if STYLE_DEPENDANT_PREFIX_TARGET:
+    if attribute_BIT:
+        sequence_length["attribute"] = 64  # Or "attribute": 1 but packing not efficient...
+    if attribute_DEPENDANT_PREFIX_TARGET:
         sequence_length["codeprefixedtargets"] = 64
-        sequence_length["codeprefix"] = 64
+        sequence_length["controlcode"] = 64
 
     ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
 
@@ -397,11 +397,11 @@ def main():
 
 
 
-    # Modified T5 "style-aware denoising autoencoder (pre-trained) bi-transformer"
+    # Modified T5 "attribute-aware denoising autoencoder (pre-trained) bi-transformer"
     utils.build_model = functools.partial(build_model_ll ,
-                                          style_embedding_encoder=STYLE_EMBEDDING_ENCODER,
-                                          style_embedding_decoder=STYLE_EMBEDDING_DECODER,
-                                          style_num=STYLE_NUM,
+                                          attribute_embedding_encoder=attribute_EMBEDDING_ENCODER,
+                                          attribute_embedding_decoder=attribute_EMBEDDING_DECODER,
+                                          attribute_num=attribute_NUM,
                                           cut_cross_attention=CUT_CROSS_ATTENTION)
 
     transformer.make_bitransformer_ll = make_bitransformer_ll
@@ -411,8 +411,8 @@ def main():
     utils.tpu_estimator_model_fn = functools.partial(tpu_estimator_model_fn_ll,
                                                      has_partial_sequences=HAS_PARTIAL_SEQUENCES,
                                                      remove_partial_sequences=REMOVE_PARTIAL_SEQUENCES,
-                                                     style_embedding=STYLE_EMBEDDING,
-                                                     style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
+                                                     attribute_embedding=attribute_EMBEDDING,
+                                                     attribute_dependant_prefix_target=attribute_DEPENDANT_PREFIX_TARGET,
                                                      cycle_consistency_loss=CYCLE_CONSISTENCY_LOSS,
                                                      lambda_ae=LAMBDA_AE,
                                                      lambda_cycle=LAMBDA_CYCLE)
@@ -441,18 +441,18 @@ def main():
     tf.io.gfile.makedirs(MODEL_DIR)
 
     sequence_length = {"inputs": 64, "targets": 64}
-    if STYLE_BIT:
-        sequence_length["style"] = 64
-    if STYLE_DEPENDANT_PREFIX_TARGET:
+    if attribute_BIT:
+        sequence_length["attribute"] = 64
+    if attribute_DEPENDANT_PREFIX_TARGET:
         sequence_length["codeprefixedtargets"] = 64
-        sequence_length["codeprefix"] = 64
+        sequence_length["controlcode"] = 64
 
     # Ou alors, based on L. 357-362  https://github.com/tensorflow/mesh/blob/a719398c92a48990921e57608ef99553ad1b1a85/mesh_tensorflow/transformer/utils.py#L357
-    # ignore et appeler le feature style "input_style" (dans ce cas length of style = 128)
+    # ignore et appeler le feature attribute "input_attribute" (dans ce cas length of attribute = 128)
 
     my_tokenizer = sentencepiece_processor.SentencePieceVocabulary(t5.data.DEFAULT_SPM_PATH)
-    left_pad_amt_1 = len(my_tokenizer.encode(TARGET_PREFIX_STYLE_1)) - 1
-    left_pad_amt_2 = len(my_tokenizer.encode(TARGET_PREFIX_STYLE_2)) - 1
+    left_pad_amt_1 = len(my_tokenizer.encode(TARGET_PREFIX_attribute_1)) - 1
+    left_pad_amt_2 = len(my_tokenizer.encode(TARGET_PREFIX_attribute_2)) - 1
 
     model = MtfModel_ll(
         model_dir=MODEL_DIR,
@@ -466,7 +466,7 @@ def main():
         keep_checkpoint_max=keep_checkpoint_max if ON_CLOUD else None,
         iterations_per_loop=100,
         model_type="bitransformer_ll",
-        style_bit=STYLE_BIT,
+        attribute_bit=attribute_BIT,
         unsupervised_style_transfer_metrics=UNSUPERVISED_STYLE_TRANSFER_METRICS,
         style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
         group_by_style=GROUP_BY_STYLE,

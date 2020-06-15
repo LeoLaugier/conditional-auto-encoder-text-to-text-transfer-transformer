@@ -1,11 +1,12 @@
-import t5
+import gin
 import tensorflow as tf
 
-def denoise_ll(dataset,
+@gin.configurable()
+def denoise(dataset,
             vocabulary,
-            noise_density=1.0, #0.15
-            noise_mask_fn=t5.data.preprocessors.iid_noise_mask,
-            inputs_fn=t5.data.preprocessors.permute_noise_tokens,  # noise_token_to_random_token_or_sentinel, #  noise_token_to_sentinel,
+            noise_density=gin.REQUIRED,  #1.0, #0.15
+            noise_mask_fn=gin.REQUIRED,  # t5.data.preprocessors.iid_noise_mask,
+            inputs_fn=gin.REQUIRED,  # t5.data.preprocessors.permute_noise_tokens,  # noise_token_to_random_token_or_sentinel, #  noise_token_to_sentinel,
             targets_fn=None,
             style_bit=True,
             style_dependant_prefix_target=True,
@@ -59,9 +60,9 @@ def denoise_ll(dataset,
     if 'targets_plaintext' in features:
       ex['targets_plaintext'] = features['targets_plaintext']
     if style_bit:
-      ex['style'] = features['style']
+      ex['attribute'] = features['attribute']
     if style_dependant_prefix_target:
       ex['codeprefixedtargets'] = features['codeprefixedtargets']
-      ex['codeprefix'] = features['codeprefix']
+      ex['controlcode'] = features['controlcode']
     return ex
   return dataset.map(my_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)

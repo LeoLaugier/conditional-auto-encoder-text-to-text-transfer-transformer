@@ -14,7 +14,7 @@ def ensure_dataset_eos_ll(dataset, feature_keys=None):
   """
   feature_keys = feature_keys or dataset.output_shapes.keys()
   def _ensure_eos(k, v):
-    if k == "style" or k == "codeprefix" or k not in feature_keys:
+    if k == "attribute" or k == "controlcode" or k not in feature_keys:
       return v
     return tf.concat([v[0:-1], tf.clip_by_value(v[-1:], 0, 1)], axis=0)
   return dataset.map(
@@ -29,8 +29,8 @@ def shift_decoder_output_fn(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature
     return tf.pad(t, [(left_pad_amt, 0)] + [(0, 0)] * (len(t.shape) - 1))
 
   def map_shift_decoder_output(x):
-    style = x["style"][0]
-    if tf.equal(style, 1):
+    attribute = x["attribute"][0]
+    if tf.equal(attribute, 1):
       return {k: _shift_decoder_output(k, t, left_pad_amt_1) for k, t in x.items()}
     return {k: _shift_decoder_output(k, t, left_pad_amt_2) for k, t in x.items()}
 

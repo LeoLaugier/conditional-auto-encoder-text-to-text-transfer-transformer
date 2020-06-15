@@ -4,7 +4,7 @@ import random
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from my_t5_data_utils import TaskRegistry_ll
+from caet5.data.utils import TaskRegistry_ll
 
 
 def print_random_predictions(task_name, sequence_length, model_dir, n=10):

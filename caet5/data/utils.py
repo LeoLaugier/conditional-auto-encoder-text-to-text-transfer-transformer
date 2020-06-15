@@ -11,7 +11,7 @@ import tensorflow_datasets as tfds
 
 
 def balance_fn(x, balance_rate=0):
-    if x["style"] <= 0.5: # tfds civil comments : "toxicity"
+    if x["attribute"] <= 0.5: # tfds civil comments : "toxicity"
         draw = tf.random.uniform([], maxval=1)
         return draw < balance_rate
     else:
@@ -20,10 +20,10 @@ def balance_fn(x, balance_rate=0):
 
 # Need to redefine TfdsTask because Task was not made to process non string inputs
 class Task_ll(t5.data.utils.Task):
-    def __init__(self, *task_args, balance_styles=False, balance_rate=0, **task_kwargs):
+    def __init__(self, *task_args, balance_attributes=False, balance_rate=0, **task_kwargs):
         super().__init__(*task_args, **task_kwargs)
         self.denoise = task_kwargs["token_preprocessor"]
-        self.balance_styles = balance_styles
+        self.balance_attributes = balance_attributes
         self.balance_rate = balance_rate
 
     def _validate_dataset_ll(
@@ -52,13 +52,13 @@ class Task_ll(t5.data.utils.Task):
                 raise ValueError(
                     "Task dataset is missing expected output feature after {label}: "
                     "{feat}".format(label=error_label, feat=feat))
-            if feat != "style" and expected_output_type != types[feat]:
+            if feat != "attribute" and expected_output_type != types[feat]:
                 raise ValueError(
                     "Task dataset has incorrect type for feature '{feat}' after "
                     "{label}: Got {actual}, expected {expected}".format(
                         feat=feat, label=error_label, actual=types[feat].name,
                         expected=expected_output_type.name))
-            if feat != "style" and expected_output_rank != len(shapes[feat]):
+            if feat != "attribute" and expected_output_rank != len(shapes[feat]):
                 raise ValueError(
                     "Task dataset has incorrect rank for feature '{feat}' after "
                     "{label}: Got {actual}, expected {expected}".format(
@@ -66,7 +66,7 @@ class Task_ll(t5.data.utils.Task):
                         expected=expected_output_rank))
 
         def _ensure_no_eos(feat, v):
-            if feat == "style" or feat not in self.output_features:
+            if feat == "attribute" or feat not in self.output_features:
                 return v
             with tf.control_dependencies([
                 tf.assert_none_equal(
@@ -111,7 +111,7 @@ class Task_ll(t5.data.utils.Task):
 
         # Trim and append EOS=1 token to model features.
         def _trim_and_append_eos(feat, v):
-            if feat == "style" or feat == "codeprefix" or feat not in self.output_features:
+            if feat == "attribute" or feat == "controlcode" or feat not in self.output_features:
                 return v
             return tf.concat([v[:sequence_length[feat] - 1], [1]], axis=0)
 
@@ -145,7 +145,7 @@ class Task_ll(t5.data.utils.Task):
             ds = self._get_cached_dataset(split, shuffle)
         else:
             ds = self._dataset_fn(split=split, shuffle_files=shuffle)
-            if self.balance_styles and mode =="train":
+            if self.balance_attributes and mode =="train":
                 ds = ds.filter(functools.partial(balance_fn, balance_rate = self.balance_rate))
             ds = self.preprocess_text_ll(ds)
             # Tokenize
@@ -163,7 +163,7 @@ class Task_ll(t5.data.utils.Task):
 
         if self.denoise and mode == "eval":
             def _trim_and_append_eos(feat, v):
-                if feat == "style" or feat == "codeprefix" or feat not in self.output_features:
+                if feat == "attribute" or feat == "controlcode" or feat not in self.output_features:
                     return v
                 return tf.concat([v[:sequence_length[feat] - 1], [1]], axis=0)
 

@@ -5,11 +5,11 @@ import t5
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from dataset import process_style
+from caet5.data.dataset import process_attribute
 import mesh_tensorflow.transformer.dataset as transformer_dataset
 
 from my_mesh_tensorflow_transformer_dataset import pack_or_pad_ll
-from my_t5_data_utils import get_mixture_or_task_ll
+from caet5.data.utils import get_mixture_or_task_ll
 
 
 @gin.configurable()
@@ -21,9 +21,9 @@ def mesh_train_dataset_fn_ll(
         ensemble_inputs,
         dataset_split=tfds.Split.TRAIN,
         use_cached=False,
-        group_by_style=True,
-        style_embedding=False,
-        style_num=2,
+        group_by_attribute=True,
+        attribute_embedding=False,
+        attribute_num=2,
         shift_decoder_output=False,
         left_pad_amt_1=0,
         left_pad_amt_2=0):
@@ -50,37 +50,37 @@ def mesh_train_dataset_fn_ll(
     ds = mixture_or_task.get_dataset(
         sequence_length, split=dataset_split, use_cached=use_cached, shuffle=True)
 
-    if group_by_style:  # TODO: Currently, we alternate deterministically batches of same style but it would be even better to alternate randomly
-        def filter_style_1_fn(x):
-            return tf.equal(x["style"][0], 1)
+    if group_by_attribute:  # TODO: Currently, we alternate deterministically batches of same attribute but it would be even better to alternate randomly
+        def filter_attribute_1_fn(x):
+            return tf.equal(x["attribute"][0], 1)
 
-        def filter_style_2_fn(x):
-            return tf.equal(x["style"][0], 2)
+        def filter_attribute_2_fn(x):
+            return tf.equal(x["attribute"][0], 2)
 
-        ds_style_1 = ds.filter(filter_style_1_fn)
-        ds_style_2 = ds.filter(filter_style_2_fn)
+        ds_attribute_1 = ds.filter(filter_attribute_1_fn)
+        ds_attribute_2 = ds.filter(filter_attribute_2_fn)
 
-        ds2_style_1 = pack_or_pad_ll(
-            ds_style_1, sequence_length, pack=False,
+        ds2_attribute_1 = pack_or_pad_ll(
+            ds_attribute_1, sequence_length, pack=False,
             feature_keys=tuple(mixture_or_task.output_features),
             ensure_eos=True,
             shift_decoder_output=shift_decoder_output,
             left_pad_amt_1=left_pad_amt_1,
             left_pad_amt_2=left_pad_amt_2)  # (not straightforward) Adapt packing so that pack=True
-        ds2_style_2 = pack_or_pad_ll(
-            ds_style_2, sequence_length, pack=False,
+        ds2_attribute_2 = pack_or_pad_ll(
+            ds_attribute_2, sequence_length, pack=False,
             feature_keys=tuple(mixture_or_task.output_features),
             ensure_eos=True,
             shift_decoder_output=shift_decoder_output,
             left_pad_amt_1=left_pad_amt_1,
             left_pad_amt_2=left_pad_amt_2)  # (not straightforward) Adapt packing so that pack=True
 
-        if style_embedding:
-            ds3_style_1 = process_style(ds2_style_1, mode="eval")
-            ds3_style_2 = process_style(ds2_style_2, mode="eval")
+        if attribute_embedding:
+            ds3_attribute_1 = process_attribute(ds2_attribute_1, mode="eval")
+            ds3_attribute_2 = process_attribute(ds2_attribute_2, mode="eval")
         else:
-            ds3_style_1 = ds2_style_1
-            ds3_style_2 = ds2_style_2
+            ds3_attribute_1 = ds2_attribute_1
+            ds3_attribute_2 = ds2_attribute_2
 
         def f1():
             return ds3_style_1
@@ -103,7 +103,7 @@ def mesh_train_dataset_fn_ll(
             shift_decoder_output=shift_decoder_output,
             left_pad_amt_1=left_pad_amt_1,
             left_pad_amt_2=left_pad_amt_2)
-        ds = process_style(ds)
+        ds = process_attribute(ds)
     return ds
 
 
@@ -148,7 +148,7 @@ def mesh_eval_dataset_fn_ll(
         )
 
         if style_embedding:
-            ds = process_style(ds, mode="eval")
+            ds = process_attribute(ds, mode="eval")
 
         ds = pack_or_pad_ll(
             ds, sequence_length, pack=False, feature_keys=task.output_features,

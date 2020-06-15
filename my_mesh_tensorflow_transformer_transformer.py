@@ -820,7 +820,7 @@ class Bitransformer_ll(Bitransformer):
     def decode(self,
                inputs,
                styles=None,
-               codeprefixes=None,
+               controlcodes=None,
                variable_dtype=mtf.VariableDType(tf.float32),
                beam_size=1,
                alpha=0.6,
@@ -887,8 +887,8 @@ class Bitransformer_ll(Bitransformer):
             beam_dim = mtf.Dimension("beam", beam_size)
             ids_shape = mtf.Shape(batch_dims + [beam_dim, decode_length_dim])
 
-        if codeprefixes:
-            partial_sequences = codeprefixes  # shift_targets(codeprefixes)
+        if controlcodes:
+            partial_sequences = controlcodes  # shift_targets(controlcodes)
         else:
             partial_sequences = mtf.zeros(inputs.mesh, ids_shape, dtype=tf.int32)
 

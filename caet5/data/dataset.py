@@ -27,66 +27,57 @@ def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
         outfile.write("%s\t%s\n" % (sentence, "0"))
 
 
-def st_preprocessor(ds, dataset=None, style_bit=False,
-                    style_dependant_prefix_input=False, input_prefix_style_1=None, input_prefix_style_2=None,
-                    style_dependant_prefix_target=False, target_prefix_style_1=None, target_prefix_style_2=None):
+def at_preprocessor(ds, attribute_processing_fn, attribute_name="attribute", attribute_bit=False,
+                    input_prefix_attributes=None, target_prefix_attributes=None, control_codes=None):
   def normalize_text(text):
     """Lowercase and remove quotes from a TensorFlow string."""
     text = tf.strings.lower(text)
     text = tf.strings.regex_replace(text, br"\\n", b"\n")
-    text = tf.strings.regex_replace(text, br"\\t", b"\n")
+    text = tf.strings.regex_replace(text, br"\\t", b"\t")
     # text = tf.strings.regex_replace(text,"'(.*)'", r"\1")
 
     return text
 
   def to_inputs_and_targets(ex):
     """
-    Map {"text": ..., [...], "style" / "toxicity": ...} ->
-        {"inputs": ..., ["style": ..., "codeprefixedtargets": ..., "codeprefix": ...,] "targets": ...}.
+    Map {"text": ..., [...], "[attribute]": ...} ->
+        {"inputs": ..., ["attribute": ..., "codeprefixedtargets": ..., "controlcode": ...,] "targets": ...}.
     """
-    style = None
-    if dataset == "IMDB" or dataset == "YELP" or dataset == "processed_CCTK":
-      style = tf.strings.to_number(ex["style"], tf.int32)
-    elif dataset == "CCTK":
-      style = tf.dtypes.cast(tf.round(ex["toxicity"]), tf.int32)
+    attribute = attribute_processing_fn(ex, attribute_name)
 
-    if style_dependant_prefix_input:
-      if tf.math.equal(style, 0):
-        inputs = tf.strings.join(
-          [input_prefix_style_1, normalize_text(ex["text"])])
-      else:
-        inputs = tf.strings.join(
-          [input_prefix_style_2, normalize_text(ex["text"])])
+    if input_prefix_attributes is None:
+      inputs = normalize_text(ex["text"])
     else:
-      inputs = tf.strings.join(
-        ["", normalize_text(ex["text"])])
+      for i in range(len(input_prefix_attributes)):
+        if tf.math.equal(attribute, i):
+          inputs = tf.strings.join([input_prefix_attributes[i], normalize_text(ex["text"])])
 
     targets = normalize_text(ex["text"])
 
     ex_processed = {"inputs": inputs, "targets": targets}
 
-    if style_bit:
-      ex_processed["style"] = tf.expand_dims(style + 1, 0)  # +1 because 0 considered as padding so styles are 1 and 2
+    if attribute_bit:
+      ex_processed["attribute"] = tf.expand_dims(attribute + 1, 0)  # +1 because 0 considered as padding so attributes
+                                                                    # are in [1; num_attributes + 1]
 
-    if style_dependant_prefix_target:
-      if tf.math.equal(style, 0):
-        codeprefixedtargets = tf.strings.join([target_prefix_style_1, normalize_text(ex["text"])])  # For training
-        codeprefix = tf.strings.join([target_prefix_style_2, ""])  # For eval, the other code prefix
-      else:
-        codeprefixedtargets = tf.strings.join([target_prefix_style_2, normalize_text(ex["text"])])  # For training
-        codeprefix = tf.strings.join([target_prefix_style_1, ""])  # For eval, the other code prefix
+    if target_prefix_attributes is not None:
+      for i in range(len(target_prefix_attributes)):
+        if tf.math.equal(attribute, i):
+          codeprefixedtargets = tf.strings.join([target_prefix_attributes[i],
+                                                 normalize_text(ex["text"])])  # teacher forcing
+          controlcode = tf.strings.join([control_codes[i], ""])  # no teacher forcing
 
       ex_processed["codeprefixedtargets"] = codeprefixedtargets
-      ex_processed["codeprefix"] = codeprefix
+      ex_processed["controlcode"] = controlcode
 
     return ex_processed
 
   return ds.map(to_inputs_and_targets, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
 
-def process_style(dataset, mode="train"):
+def process_attribute(dataset, mode="train"):
   def map_fn(x):
-    style = x["style"]
+    attribute = x["attribute"]
     inputs = x["inputs"]
     inputs_padding = tf.cast(tf.not_equal(inputs, 0), tf.int32)
 
@@ -98,10 +89,10 @@ def process_style(dataset, mode="train"):
       indices = tf.zeros_like(inputs)
     elif mode == "infer":
       indices = tf.zeros_like(inputs)
-      style = tf.expand_dims(tf.strings.to_number(style, out_type=tf.int32), 0)
+      attribute = tf.expand_dims(tf.strings.to_number(attribute, out_type=tf.int32), 0)
 
-    processed_style = tf.gather(style, indices)
-    x["style"] = processed_style * inputs_padding
+    processed_attribute = tf.gather(attribute, indices)
+    x["attribute"] = processed_attribute * inputs_padding
     return x
 
   dataset = dataset.map(map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)

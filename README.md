@@ -12,3 +12,5 @@ Requirements:
 
 To run on TPU: python main.py
 
+--gin_file="objectives/denoise.gin"
+

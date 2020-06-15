@@ -19,7 +19,7 @@ from mesh_tensorflow.transformer.utils import _dynamic_text2self, get_variable_d
     write_lines_to_file, get_checkpoint_iterator, \
     get_step_from_checkpoint_path, decode, get_inputs_from_file, encode_inputs, decode_from_file
 
-from dataset import process_style
+from caet5.data.dataset import process_attribute
 from my_mesh_tensorflow_transformer_transformer import Bitransformer_ll, make_bitransformer_ll
 
 
@@ -34,9 +34,9 @@ def build_model_ll(model_type="bitransformer_ll",
                    output_vocab_size=gin.REQUIRED,
                    layout_rules=None,
                    mesh_shape=None,
-                   style_embedding_encoder=False,
-                   style_embedding_decoder=False,
-                   style_num=2,
+                   attribute_embedding_encoder=False,
+                   attribute_embedding_decoder=False,
+                   attribute_num=2,
                    cut_cross_attention=True):
     """Build a transformer model.
     Currently, four types of models are supported:
@@ -96,9 +96,9 @@ def build_model_ll(model_type="bitransformer_ll",
             output_vocab_size=output_vocab_size,
             mesh_shape=mesh_shape,
             layout=layout_rules,
-            style_embedding_encoder=style_embedding_encoder,
-            style_embedding_decoder=style_embedding_decoder,
-            style_num=style_num,
+            attribute_embedding_encoder=attribute_embedding_encoder,
+            attribute_embedding_decoder=attribute_embedding_decoder,
+            attribute_num=attribute_num,
             cut_cross_attention=cut_cross_attention)
     else:
         raise ValueError("unknown model_type!")
@@ -127,10 +127,10 @@ def tpu_estimator_model_fn_ll(model_type,
                               init_checkpoint=None,
                               ensemble_inputs=None,
                               mesh_devices=None,
-                              style_embedding=False,
+                              attribute_embedding=False,
                               has_partial_sequences=True,
                               remove_partial_sequences=True,
-                              style_dependant_prefix_target=True,
+                              attribute_dependant_prefix_target=True,
                               cycle_consistency_loss=True,
                               lambda_ae=1.0,
                               lambda_cycle=1.0):
@@ -244,7 +244,7 @@ def tpu_estimator_model_fn_ll(model_type,
                     x, [x], "import feature %s" % key, summarize=1000, first_n=10)
             mtf_features[key] = mtf.import_fully_replicated(
                 mesh, x, feature_shape, name=key)
-            if key == "targets" or key == "codeprefixedtargets" or key == "codeprefix":
+            if key == "targets" or key == "codeprefixedtargets" or key == "controlcode":
                 anon_targets = mtf.anonymize(mtf_features[key])
 
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -267,9 +267,9 @@ def tpu_estimator_model_fn_ll(model_type,
                 styles = None
 
             if has_partial_sequences:
-                codeprefixes = mtf_features["codeprefix"]
+                controlcode = mtf_features["controlcode"]
             else:
-                codeprefixes = None
+                controlcode = None
 
             if predict_fn:
                 mtf_samples = predict_fn(
@@ -286,7 +286,7 @@ def tpu_estimator_model_fn_ll(model_type,
             elif isinstance(transformer_model,
                             Bitransformer_ll):
                 mtf_samples = transformer_model.decode(
-                    inputs, styles=styles, codeprefixes=codeprefixes, has_partial_sequences=has_partial_sequences,
+                    inputs, styles=styles, controlcodes=controlcode, has_partial_sequences=has_partial_sequences,
                     remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())  #
             elif isinstance(transformer_model,
                             (transformer.Bitransformer, transformer.StudentTeacher)):
@@ -406,12 +406,12 @@ def tpu_estimator_model_fn_ll(model_type,
                         **position_kwargs)
 
                     if has_partial_sequences:
-                        codeprefixes = mtf_features["codeprefix"]
+                        controlcodes = mtf_features["controlcode"]
                     else:
-                        codeprefixes = None
+                        controlcodes = None
 
                     mtf_samples = transformer_model.decode(
-                        inputs, styles=styles, codeprefixes=codeprefixes, has_partial_sequences=has_partial_sequences,
+                        inputs, styles=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
                         remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())
                     # mtf_samples = mtf.anonymize(mtf_samples)
                     outputs = mtf_samples
@@ -664,7 +664,7 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
             feature keys 'inputs' and 'targets_plaintext'.
           - postprocess_fn: function which converts plaintext targets to values
             that can be processed by a `metric_fn`.
-          - list_of_metric_fns: list of metric functions with the call signature
+          - list_of_metric_fns: list of metric_name functions with the call signature
             `metric_fn(targets, predictions)` which returns a dict mapping
             submetric names to scalar values. TensorBoard summaries and other tags
             will be written out using the submetric names.
@@ -741,13 +741,13 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                     cached_styles_origin[eval_dataset.name] = styles_origin
 
     if style_bit:
-        _INPUT_FEATURES_ll.append("style")
+        _INPUT_FEATURES_ll.append("attribute")
 
     if style_dependant_prefix_target:
-        _INPUT_FEATURES_ll.extend(["codeprefix",
-                                   "codeprefix_position",
-                                   "codeprefix_segmentation",
-                                   "codeprefix_subsegmentation",
+        _INPUT_FEATURES_ll.extend(["controlcode",
+                                   "controlcode_position",
+                                   "controlcode_segmentation",
+                                   "controlcode_subsegmentation",
                                    "codeprefixedtargets",
                                    "codeprefixedtargets_position",
                                    "codeprefixedtargets_segmentation",
@@ -855,35 +855,35 @@ def decode_from_file_ll(estimator,
 
     inputs = []
     dst_styles = []
-    codeprefixes = []
+    controlcodes = []
     for l in inputs_split:
         inputs.append(l[0])
         dst_styles.append(l[1])
         if l[1] == "1":
-            codeprefixes.append(target_prefix_style_1)
+            controlcodes.append(target_prefix_style_1)
         elif l[1] == "2":
-            codeprefixes.append(target_prefix_style_2)
+            controlcodes.append(target_prefix_style_2)
         else:
-            codeprefixes.append("")
+            controlcodes.append("")
 
     all_input_ids = encode_inputs(inputs, vocabulary, model_type, batch_size,
                                   sequence_length["inputs"], eos_id=eos_id)
     if style_dependant_prefix_target:
-        all_codeprefix_ids = encode_inputs(codeprefixes, vocabulary, "lm", batch_size,
-                                           sequence_length["codeprefix"], eos_id=eos_id)
+        all_controlcode_ids = encode_inputs(controlcodes, vocabulary, "lm", batch_size,
+                                           sequence_length["controlcode"], eos_id=eos_id)
 
     def input_fn(params):
         del params
 
         tensors = {"inputs": all_input_ids}
         if style_embedding:
-            tensors["style"] = dst_styles
+            tensors["attribute"] = dst_styles
         if style_dependant_prefix_target:
-            tensors["codeprefix"] = all_codeprefix_ids
+            tensors["controlcode"] = all_controlcode_ids
 
         dataset = tf.data.Dataset.from_tensor_slices(tensors)
         if style_embedding:
-            dataset = process_style(dataset, mode="infer")
+            dataset = process_attribute(dataset, mode="infer")
         dataset = dataset.flat_map(
             lambda x: tf.data.Dataset.from_tensors(x).repeat(repeats))
         dataset = dataset.batch(batch_size, drop_remainder=True)
