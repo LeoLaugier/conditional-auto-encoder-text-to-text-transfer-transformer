@@ -2,3 +2,15 @@
 \.pyvenv/
 
 \.idea/
+
+\.pyvenv_local/
+
+\.pyvenv_local2/
+
+\.pyvenv_local3/
+
+\.pyvenv_local4/
+
+CAE_t5\.egg-info/
+
+dist/

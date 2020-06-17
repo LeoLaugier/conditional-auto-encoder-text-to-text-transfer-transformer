@@ -1,3 +1,4 @@
+import gin
 import math
 import numpy as np
 import t5
@@ -11,8 +12,9 @@ from torchtext import data
 
 from caet5.data.dataset import MyDataset
 
-def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, attributes_origin=None, batch_size=8,
-                             block_size=256):
+@gin.configurable
+def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, batch_size=8, block_size=-1,
+                             **unused_kwargs):
   eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
 
   def collate(examples):
@@ -44,8 +46,8 @@ def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device,
 
   return {"perplexity": perplexity}
 
-def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, attributes_origin=None, batch_size=8,
-                             block_size=256):
+def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, batch_size=8, block_size=256,
+                             **unused_kwargs):
   # Too early, wait for transformers v2.9.0, otherwise:
   # ImportError: cannot import name 'DataCollatorForLanguageModeling'
   training_args = TrainingArguments(output_dir="./gpt2_preds", do_eval=True, per_gpu_eval_batch_size=batch_size)
@@ -67,7 +69,7 @@ def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, attribu
   return {"perplexity": perplexity}
 
 
-def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, attributes_origin=None):
+def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, **unused_kwargs):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,
                                                 max_length=tokenizer.max_len)["input_ids"]
   all_input_ids = [torch.tensor(example, dtype=torch.long) for example in examples]
@@ -91,7 +93,7 @@ def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, attribute
   return {"perplexity": perplexity}
 
 
-def kenlm_perplexity(targets, predictions, ppl_model, attributes_origin=None):
+def kenlm_perplexity(targets, predictions, ppl_model, **unused_kwargs):
   sum_ppl_scores = 0
   length = 0
 
@@ -104,7 +106,7 @@ def kenlm_perplexity(targets, predictions, ppl_model, attributes_origin=None):
 
   return {"perplexity": perplexity}
 
-
+@gin.configurable
 def bert_attribute_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None,
                                   batch_size=32):
   # torchtext dataset
@@ -153,7 +155,8 @@ def bert_attribute_accuracy_batch(targets, predictions, classifier_model, tokeni
   return {"attribute_accuracy": epoch_acc / len(valid_iterator)}
 
 
-def bert_attribute_accuracy(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None, batch_size=32):
+def bert_attribute_accuracy(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None,
+                            batch_size=32):
   batch_encoding = tokenizer.batch_encode_plus(predictions, max_length=tokenizer.max_len, pad_to_max_length=True)
 
   features = []
@@ -206,7 +209,7 @@ def bleu(targets, predictions, attributes_origin=None):
   return t5.evaluation.metrics.bleu(targets, predictions)
 
 
-def sentence_similarity(targets, predictions, sentence_similarity_model, attributes_origin=None):
+def sentence_similarity(targets, predictions, sentence_similarity_model, **unused_kwargs):
   with tf.Session() as session:
     session.run([tf.global_variables_initializer(), tf.tables_initializer()])
     targets_embeddings = session.run(sentence_similarity_model(targets))

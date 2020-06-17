@@ -26,16 +26,14 @@ setuptools.setup(
     scripts=[],
     install_requires=[ #TODO Check versions
         "tensorflow",
-        "tensorflow-text<2",
-        "transformers==2.8.0",
-        "tfds-nightly>=1.3.2.dev201912070105,<2.1.0.dev202003190105",
+        #"tensorflow-text",
+        #"transformers==2.8.0",
+        #"tfds-nightly",
         "t5==0.5.0",
-        "fasttext",
-        "https://github.com/kpu/kenlm/archive/master.zip",
     ],
     entry_points={
         'console_scripts': [
-            'caet5 = caet5.main:console_entry_point' # TODO
+            'caet5 = caet5.main:console_entry_point'
         ],
     },
     classifiers=[

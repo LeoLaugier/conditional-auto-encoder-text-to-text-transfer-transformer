@@ -41,7 +41,7 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):
         source_file_name,
         destination_blob_name))
 
-
+@gin.configurable
 def setup_parametric_evaluator(eval_fn, *load_fn_args, evaluator_name="Parametric evaluator", model_filename=None,
                                model_architecture = None, metric_name=None, task=None, ext=None, base_dir=None,
                                bucket = None, gcs_service=None, load_parametric_model_fn=None, **load_fn_kwargs):
@@ -75,7 +75,7 @@ def setup_parametric_evaluator(eval_fn, *load_fn_args, evaluator_name="Parametri
 
   return metric_fn
 
-
+@gin.configurable
 def load_finetuned_transformer(evaluator_name, finetuned_model_local_path, pretrained_model_name_or_path,
                                load_tokenizer_fn, load_config_fn, load_pretrained_fn, map_location=None, **kwargs):
     device = "cpu"  # xm.xla_device()

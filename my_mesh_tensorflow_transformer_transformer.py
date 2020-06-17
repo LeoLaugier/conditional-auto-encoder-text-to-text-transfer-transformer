@@ -182,12 +182,12 @@ class Unitransformer_ll(Unitransformer):
             x += pos_emb
 
         if self.style_embedding:
-            if "style_embedding" in context.shared_params:
-                sty_emb_var = context.shared_params["style_embedding"]
+            if "attribute_embedding" in context.shared_params:
+                sty_emb_var = context.shared_params["attribute_embedding"]
             else:
                 sty_emb_var = mtf.layers.embedding_weights(
                     mesh, self.style_dim, self.model_dim, context.variable_dtype,
-                    "style_embedding", ensemble_dim=self.ensemble_dim)
+                    "attribute_embedding", ensemble_dim=self.ensemble_dim)
 
             sty_emb = mtf.gather(
                 sty_emb_var, styles, self.style_dim,
@@ -357,7 +357,7 @@ class Unitransformer_ll(Unitransformer):
         If there are no partial sequences (you want to sample from the beginning),
         then pass partial_sequences=mtf.zeros(mesh, shape, dtype=tf.int32) and
         has_partial_sequences=False (so we can skip computation).
-        The dst_styles represents the destination styles in which we want to generate sequences.
+        The dst_styles represents the destination attributes in which we want to generate sequences.
         Args:
           partial_sequences: an int32 Tensor with shape [<batch_dims>, length_dim]
           dst_style: an int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
@@ -543,7 +543,7 @@ class Unitransformer_ll(Unitransformer):
           inputs: an int32 zero-Tensor with shape [<batch_dims>, beam_dim,
             length_dim].#
           decode_length: an int32 mtf scalar.  Maximum decode length.
-          styles: an int32 zero-Tensor with shape [<batch_dims>, beam_dim, length_dim]
+          attributes: an int32 zero-Tensor with shape [<batch_dims>, beam_dim, length_dim]
                                           ([<batch_dims>]
                                            [<batch_dims>, beam_dim]).
           variable_dtype: a mtf.VariableDType
@@ -724,9 +724,9 @@ class Bitransformer_ll(Bitransformer):
                         ensemble_dim=self.encoder.ensemble_dim)
                 if (self.encoder.style_embedding
                         and self.decoder.style_embedding):
-                    shared_params["style_embedding"] = mtf.layers.embedding_weights(
+                    shared_params["attribute_embedding"] = mtf.layers.embedding_weights(
                         mesh, self.encoder.style_dim, self.encoder.model_dim,
-                        variable_dtype, "style_embedding",
+                        variable_dtype, "attribute_embedding",
                         ensemble_dim=self.encoder.ensemble_dim)
         return shared_params
 
@@ -742,7 +742,7 @@ class Bitransformer_ll(Bitransformer):
                     decoder_sequence_id=None,
                     decoder_subsequence_id=None,
                     encoder_position=None,
-                    decoder_position=None):  # styles=None for debugging?
+                    decoder_position=None):  # attributes=None for debugging?
         """Compute logits based on inputs (all positions in parallel).
         This is called during training and evaluation.
         Args:
@@ -819,7 +819,7 @@ class Bitransformer_ll(Bitransformer):
     @gin.configurable(module="Bitransformer_ll")
     def decode(self,
                inputs,
-               styles=None,
+               attributes=None,
                controlcodes=None,
                variable_dtype=mtf.VariableDType(tf.float32),
                beam_size=1,
@@ -835,7 +835,7 @@ class Bitransformer_ll(Bitransformer):
         input length dimension?
         Args:
           inputs: a Tensor with shape [<batch_dims>, beam_dim, length_dim]
-          styles: a Tensor with shape [<batch_dims>]
+          attributes: a Tensor with shape [<batch_dims>]
                                    or [<batch_dims>, beam_dim]
                                    or [<batch_dims>, beam_dim, length_dim]
           variable_dtype: a mtf.VariableDType
@@ -856,7 +856,7 @@ class Bitransformer_ll(Bitransformer):
             inputs=inputs,
             targets=None,
             compute_loss=False,
-            styles=styles,
+            styles=attributes,
             mode=tf.estimator.ModeKeys.PREDICT,
             variable_dtype=variable_dtype,
             sequence_id=encoder_sequence_id,
@@ -895,7 +895,7 @@ class Bitransformer_ll(Bitransformer):
         if beam_size == 1:
             return self.decoder.sample_autoregressive(
                 partial_sequences,
-                dst_styles=styles,
+                dst_styles=attributes,
                 temperature=temperature,
                 variable_dtype=variable_dtype,
                 encoder_output=encoder_output,
@@ -922,7 +922,7 @@ class Bitransformer_ll(Bitransformer):
             return self.decoder.beam_search(
                 partial_sequences,
                 decode_length,
-                dst_styles=styles,
+                dst_styles=attributes,
                 variable_dtype=variable_dtype,
                 encoder_output=encoder_output,
                 encoder_sequence_id=encoder_sequence_id,

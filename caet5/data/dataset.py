@@ -1,32 +1,39 @@
+import functools
+import gin
 import tensorflow as tf
 import torch
 from torch.utils.data import Dataset
 
 
-def raw_to_tsv(in_fname_1, in_fname_0, out_fname, mode):
-  with tf.io.gfile.GFile(in_fname_1, mode) as infile_1,\
-       tf.io.gfile.GFile(in_fname_0, mode) as infile_0,\
-       tf.io.gfile.GFile(out_fname, "w") as outfile:
-    if in_fname_1:
-      sentences_1  = infile_1.readlines()
-      for sentence in sentences_1:
-        sentence = sentence.rstrip()
-        # sentence = sentence.decode("utf-8")
-        # outfile.write(sentence+"\t"+"1\n")
-        if mode == "rb":
-          sentence = sentence.decode("utf-8")
-        sentence = sentence.replace("\t", "\\t")
-        outfile.write("%s\t%s\n" % (sentence, "1"))
-    if in_fname_0:
-      sentences_0  = infile_0.readlines()
-      for sentence in sentences_0:
-        sentence = sentence.rstrip()
-        if mode == "rb":
-          sentence = sentence.decode("utf-8")
-        sentence = sentence.replace("\t", "\\t")
-        outfile.write("%s\t%s\n" % (sentence, "0"))
+def raw_to_tsv(in_fnames, out_fname, mode="r"):
+  with tf.io.gfile.GFile(out_fname, "w") as outfile:
+    for attribute, in_fname in in_fnames:
+      with tf.io.gfile.GFile(in_fname, mode) as infile:
+        sentences = infile.readlines()
+        for sentence in sentences:
+          sentence = sentence.rstrip()
+          if mode == "rb":
+            sentence = sentence.decode("utf-8")
+          sentence = sentence.replace("\t", "\\t")
+          outfile.write("%s\t%s\n" % (sentence, str(attribute)))
 
 
+def tsv_to_dataset_fn(split, dataset_tsv_path, shuffle_files=False):
+    # We only have one file for each split.
+    del shuffle_files
+
+    # Load lines from the text file as examples.
+    ds = tf.data.TextLineDataset(dataset_tsv_path[split])
+    ds = ds.map(
+        functools.partial(tf.io.decode_csv, record_defaults=["", ""],
+                          field_delim="\t", use_quote_delim=False),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    ds = ds.map(lambda *ex: dict(zip(["text", "attribute"], ex)))
+    return ds
+
+
+@gin.configurable()
 def at_preprocessor(ds, attribute_processing_fn, attribute_name="attribute", attribute_bit=False,
                     input_prefix_attributes=None, target_prefix_attributes=None, control_codes=None):
   def normalize_text(text):
@@ -73,6 +80,14 @@ def at_preprocessor(ds, attribute_processing_fn, attribute_name="attribute", att
     return ex_processed
 
   return ds.map(to_inputs_and_targets, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+@gin.configurable()
+def attribute_processing_tsv(ex, attribute_name):
+  return tf.strings.to_number(ex[attribute_name], tf.int32)
+
+@gin.configurable()
+def attribute_processing_tfds(ex, attribute_name):  # attribute_name = "toxicity" for tfds CCTK
+  return tf.dtypes.cast(tf.round(ex[attribute_name]), tf.int32)
 
 
 def process_attribute(dataset, mode="train"):

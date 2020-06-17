@@ -470,7 +470,7 @@ def main():
         unsupervised_style_transfer_metrics=UNSUPERVISED_STYLE_TRANSFER_METRICS,
         style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
         group_by_style=GROUP_BY_STYLE,
-        style_embedding=STYLE_EMBEDDING,
+        attribute_embedding=STYLE_EMBEDDING,
         style_num=STYLE_NUM,
         shift_decoder_output=SHIFT_DECODER_OUTPUT,
         left_pad_amt_1=left_pad_amt_1,

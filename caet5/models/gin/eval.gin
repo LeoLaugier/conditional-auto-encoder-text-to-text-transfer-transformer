@@ -1,4 +1,37 @@
-
-
 eval_checkpoint_step = "all"
+
+# Parameters for acc/setup_parametric_evaluator:
+# ==============================================================================
+acc/setup_parametric_evaluator.eval_fn = @caet5.evaluation.metrics.bert_attribute_accuracy_batch
+acc/setup_parametric_evaluator.evaluator_name = "Fine-tuned attribute classifier"
+acc/setup_parametric_evaluator.metric_name = "acc"
+
+acc/processed_cctk/setup_parametric_evaluator.model_architecture = "bert"
+acc/processed_cctk/setup_parametric_evaluator.ext = "pt"
+acc/processed_cctk/setup_parametric_evaluator.load_parametric_model_fn = @load_finetuned_transformer
+acc/processed_cctk/setup_parametric_evaluator.pretrained_model_name_or_path = "bert-base-uncased"
+acc/processed_cctk/setup_parametric_evaluator.load_tokenizer_fn = @AutoTokenizer.from_pretrained
+acc/processed_cctk/setup_parametric_evaluator.load_config_fn = @BertConfig.from_pretrained
+acc/processed_cctk/setup_parametric_evaluator.load_pretrained_fn = @BertForSequenceClassification.from_pretrained
+acc/processed_cctk/setup_parametric_evaluator.batch_size = 32
+
+BertForSequenceClassification.from_pretrained.pretrained_acc_name_or_path = "bert-base-uncased"
+BertConfig.from_pretrained.num_labels = 1
+
+
+# Parameters for ppl/setup_parametric_evaluator:
+# ==============================================================================
+ppl/setup_parametric_evaluator.eval_fn = @caet5.evaluation.metrics.gpt_perplexity_batch_280
+ppl/setup_parametric_evaluator.evaluator_name = "Fine-tuned language model"
+ppl/setup_parametric_evaluator.metric_name = "ppl"
+
+ppl/processed_cctk/setup_parametric_evaluator.model_architecture = "gpt2"
+ppl/processed_cctk/setup_parametric_evaluator.ext = "pt"
+ppl/processed_cctk/setup_parametric_evaluator.load_parametric_model_fn = @load_finetuned_transformer
+ppl/processed_cctk/setup_parametric_evaluator.pretrained_model_name_or_path = "gpt2"
+ppl/processed_cctk/setup_parametric_evaluator.load_tokenizer_fn = @AutoTokenizer.from_pretrained
+ppl/processed_cctk/setup_parametric_evaluator.load_config_fn = @AutoConfig.from_pretrained
+ppl/processed_cctk/setup_parametric_evaluator.load_pretrained_fn = @AutoModelWithLMHead.from_config
+ppl/processed_cctk/setup_parametric_evaluator.batch_size = 8
+ppl/processed_cctk/setup_parametric_evaluator.block_size = 256
 

@@ -1,0 +1,4 @@
+at_preprocessor.attribute_processing_tsv = @attribute_processing_tsv
+at_preprocessor.target_prefix_attributes = ["civil: ", "toxic: "]
+at_preprocessor.control_codes = ["toxic: ", "civil: "]
+at_preprocessor.attribute_bit = True

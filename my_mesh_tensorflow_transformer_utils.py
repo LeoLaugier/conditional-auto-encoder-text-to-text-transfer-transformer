@@ -261,10 +261,10 @@ def tpu_estimator_model_fn_ll(model_type,
             }
             inputs = mtf_features["inputs"]
 
-            if style_embedding:
-                styles = mtf_features["style"]
+            if attribute_embedding:
+                attributes = mtf_features["style"]
             else:
-                styles = None
+                attributes = None
 
             if has_partial_sequences:
                 controlcode = mtf_features["controlcode"]
@@ -286,7 +286,7 @@ def tpu_estimator_model_fn_ll(model_type,
             elif isinstance(transformer_model,
                             Bitransformer_ll):
                 mtf_samples = transformer_model.decode(
-                    inputs, styles=styles, controlcodes=controlcode, has_partial_sequences=has_partial_sequences,
+                    inputs, attributes=attributes, controlcodes=controlcode, has_partial_sequences=has_partial_sequences,
                     remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())  #
             elif isinstance(transformer_model,
                             (transformer.Bitransformer, transformer.StudentTeacher)):
@@ -411,7 +411,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         controlcodes = None
 
                     mtf_samples = transformer_model.decode(
-                        inputs, styles=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
+                        inputs, attributes=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
                         remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())
                     # mtf_samples = mtf.anonymize(mtf_samples)
                     outputs = mtf_samples
@@ -639,7 +639,7 @@ def write_lines_to_file_ll(lines, filename):
 
 def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                   dataset_split, model_dir, eval_dataset_fn, eval_summary_dir,
-                  eval_checkpoint_step, style_bit=True, unsupervised_style_transfer_metrics=True,
+                  eval_checkpoint_step, attribute_bit=True, unsupervised_style_transfer_metrics=True,
                   style_dependant_prefix_target=True):
     """Eval a Mesh-TF model.
     Args:
@@ -707,8 +707,8 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
     # Pre-load in all of the targets once before entering continuous eval loop
     cached_targets = {}
     cached_examples = {}
-    if style_bit:
-        cached_styles_origin = {}
+    if attribute_bit:
+        cached_attributes_origin = {}
     # Need to create a separate graph for loading in plaintext targets
     # or else TF will complain that we modified the graph
     with tf.Graph().as_default():
@@ -724,9 +724,9 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                     for ex in examples
                 ]
 
-                if style_bit:
-                    styles_origin = [
-                        str(ex["style"][0] - 1)
+                if attribute_bit:
+                    attributes_origin = [
+                        str(ex["attribute"][0] - 1)
                         for ex in examples
                     ]
 
@@ -737,10 +737,10 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                 write_lines_to_file(targets, targets_filename)
                 cached_targets[eval_dataset.name] = targets
                 cached_examples[eval_dataset.name] = examples
-                if style_bit:
-                    cached_styles_origin[eval_dataset.name] = styles_origin
+                if attribute_bit:
+                    cached_attributes_origin[eval_dataset.name] = attributes_origin
 
-    if style_bit:
+    if attribute_bit:
         _INPUT_FEATURES_ll.append("attribute")
 
     if style_dependant_prefix_target:
@@ -802,9 +802,9 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
             for metric_fn in eval_dataset.metric_fns:
                 summary = tf.Summary()
                 targets = cached_targets[eval_dataset.name]
-                if unsupervised_style_transfer_metrics and style_bit:
-                    styles_origin = cached_styles_origin[eval_dataset.name]
-                    metric_result = metric_fn(targets, predictions, styles_origin=styles_origin)
+                if unsupervised_style_transfer_metrics and attribute_bit:
+                    attributes_origin = cached_attributes_origin[eval_dataset.name]
+                    metric_result = metric_fn(targets, predictions, attributes_origin=attributes_origin)
                 else:
                     metric_result = metric_fn(targets, predictions)
                 for metric_name, metric_value in metric_result.items():
@@ -989,7 +989,7 @@ def train_model_ll(estimator, vocabulary, sequence_length, batch_size,
         vocabulary=vocabulary,
         dataset_split=dataset_split)
     dataset = dataset.batch(
-        batch_size * (ensemble_inputs or 1), drop_remainder=True).repeat() # swap batch and repeat to avoid modular problems that eventually causes batches of different styles after some epochs
+        batch_size * (ensemble_inputs or 1), drop_remainder=True).repeat() # swap batch and repeat to avoid modular problems that eventually causes batches of different attributes after some epochs
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
