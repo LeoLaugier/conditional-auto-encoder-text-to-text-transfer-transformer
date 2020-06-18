@@ -14,3 +14,15 @@
 CAE_t5\.egg-info/
 
 dist/
+
+\.pyvenv_local5/
+
+\.pyvenv_local6/
+
+\.pyvenv_local7/
+
+\.pyvenv_local8/
+
+\.pyvenv_local_9/
+
+caet5\.egg-info/

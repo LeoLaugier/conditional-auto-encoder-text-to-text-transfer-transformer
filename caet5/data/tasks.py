@@ -12,14 +12,16 @@ import tensorflow_hub as hub
 from transformers import AutoModelWithLMHead, BertForSequenceClassification, BertConfig, AutoTokenizer, AutoConfig
 from t5.data import preprocessors
 
-import caet5.data
+#import caet5.data
 from caet5.data.dataset import at_preprocessor, tsv_to_dataset_fn, raw_to_tsv
 from caet5.evaluation.metrics import bleu, sentence_similarity
 from caet5.evaluation.metrics_utils import setup_parametric_evaluator
 
+from caet5.data.utils import TaskRegistry_ll
+
 FLAGS = flags.FLAGS
 
-TaskRegistry_ll = caet5.data.TaskRegistry_ll
+#TaskRegistry_ll = caet5.data.utils.TaskRegistry_ll
 
 DEFAULT_SPM_PATH = "gs://t5-data/vocabs/cc_all.32000/sentencepiece.model"  # GCS
 

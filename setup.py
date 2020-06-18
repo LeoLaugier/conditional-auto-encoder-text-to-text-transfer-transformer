@@ -13,7 +13,7 @@ with open('README.md') as fp:
   _LONG_DESCRIPTION = fp.read()
 
 setuptools.setup(
-    name='CAE-t5',
+    name='caet5',
     version=__version__,
     description='Canditional auto-encoder text-to-text transfer transformer',
     long_description=_LONG_DESCRIPTION,
@@ -25,10 +25,14 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     scripts=[],
     install_requires=[ #TODO Check versions
-        "tensorflow",
+        #"tensorflow",
         #"tensorflow-text",
         #"transformers==2.8.0",
         #"tfds-nightly",
+        "google-api-python-client",
+        "google-cloud_storage",
+        "tensorflow_hub",
+        "torchtext",
         "t5==0.5.0",
     ],
     entry_points={
