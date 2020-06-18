@@ -18,7 +18,7 @@ def raw_to_tsv(in_fnames, out_fname, mode="r"):
           outfile.write("%s\t%s\n" % (sentence, str(attribute)))
 
 
-def tsv_to_dataset_fn(split, dataset_tsv_path, shuffle_files=False):
+def tsv_to_dataset_fn(split, shuffle_files=False, dataset_tsv_path=None):
     # We only have one file for each split.
     del shuffle_files
 
@@ -68,6 +68,8 @@ def at_preprocessor(ds, attribute_processing_fn, attribute_name="attribute", att
                                                                     # are in [1; num_attributes + 1]
 
     if target_prefix_attributes is not None:
+      codeprefixedtargets = tf.strings.join(["", ""])
+      controlcode = tf.strings.join(["", ""])
       for i in range(len(target_prefix_attributes)):
         if tf.math.equal(attribute, i):
           codeprefixedtargets = tf.strings.join([target_prefix_attributes[i],

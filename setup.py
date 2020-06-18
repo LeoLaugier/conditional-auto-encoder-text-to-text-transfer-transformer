@@ -24,7 +24,7 @@ setuptools.setup(
     # license='Apache 2.0', # TODO
     packages=setuptools.find_packages(),
     scripts=[],
-    install_requires=[ #TODO Check versions
+    install_requires=[ #TODO Update CAET5 to fit last versions of transformers and t5
         #"tensorflow",
         #"tensorflow-text",
         #"transformers==2.8.0",
@@ -33,6 +33,7 @@ setuptools.setup(
         "google-cloud_storage",
         "tensorflow_hub",
         "torchtext",
+        "transformers==2.8.0",
         "t5==0.5.0",
     ],
     entry_points={

@@ -43,10 +43,9 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):
         source_file_name,
         destination_blob_name))
 
-@gin.configurable
 def setup_parametric_evaluator(eval_fn, *load_fn_args, evaluator_name="Parametric evaluator", model_filename=None,
-                               model_architecture = None, metric_name=None, task=None, ext=None, base_dir=None,
-                               bucket = None, gcs_service=None, load_parametric_model_fn=None, **load_fn_kwargs):
+                               model_architecture=None, metric_name=None, task=None, ext=None, base_dir=None,
+                               bucket=None, gcs_service=None, load_parametric_model_fn=None, **load_fn_kwargs):
   if not model_filename:
     if not model_architecture or not task:
       raise ValueError("Must specify model_filename or (model_architecture and task)")
@@ -73,11 +72,14 @@ def setup_parametric_evaluator(eval_fn, *load_fn_args, evaluator_name="Parametri
   eval_fn_args, eval_fn_kwargs = load_parametric_model_fn(evaluator_name, parametric_model_local_path, *load_fn_args,
                                                           **load_fn_kwargs)
 
-  metric_fn = functools.partial(eval_fn, *eval_fn_args, **eval_fn_kwargs)
+  partial_metric_fn = functools.partial(eval_fn, *eval_fn_args, **eval_fn_kwargs)
+
+  def metric_fn(targets, predictions, *args, **kwargs):
+      return partial_metric_fn(targets, predictions, *args, **kwargs)
 
   return metric_fn
 
-@gin.configurable
+
 def load_finetuned_transformer(evaluator_name, finetuned_model_local_path, pretrained_model_name_or_path,
                                load_tokenizer_fn, load_config_fn, load_pretrained_fn, map_location=None, **kwargs):
     device = "cpu"  # xm.xla_device()

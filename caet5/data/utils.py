@@ -6,7 +6,7 @@ from t5.data.utils import _DEFAULT_FEATURE_KEYS, _VALID_TASK_NAME_REGEX, _INFO_F
     _TFRECORD_PREFIX, _MAX_EXAMPLES_TO_MEM_CACHE, _SHUFFLE_BUFFER_SIZE, _TFDS_DATA_DIR_OVERRIDE, \
     _GLOBAL_CACHE_DIRECTORIES, encode_string_features, DatasetProviderRegistry, TfdsTask, DatasetProviderBase
 # from t5.data.utils import *
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
 
 

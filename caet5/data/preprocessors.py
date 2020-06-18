@@ -1,15 +1,16 @@
 import gin
 import tensorflow as tf
 
+
 @gin.configurable()
-def denoise(dataset,
+def denoise_ll(dataset,
             vocabulary,
             noise_density=gin.REQUIRED,  #1.0, #0.15
             noise_mask_fn=gin.REQUIRED,  # t5.data.preprocessors.iid_noise_mask,
             inputs_fn=gin.REQUIRED,  # t5.data.preprocessors.permute_noise_tokens,  # noise_token_to_random_token_or_sentinel, #  noise_token_to_sentinel,
             targets_fn=None,
-            style_bit=True,
-            style_dependant_prefix_target=True,
+            attribute_bit=False,
+            target_prefix_attributes=None,
             **unused_kwargs):
   """Gin-configurable token preprocessor for self-supervised denoising tasks.
   This function takes a dataset containing "targets" sequences,
@@ -59,9 +60,9 @@ def denoise(dataset,
       ex['inputs_plaintext'] = features['inputs_plaintext']
     if 'targets_plaintext' in features:
       ex['targets_plaintext'] = features['targets_plaintext']
-    if style_bit:
+    if attribute_bit:
       ex['attribute'] = features['attribute']
-    if style_dependant_prefix_target:
+    if target_prefix_attributes:
       ex['codeprefixedtargets'] = features['codeprefixedtargets']
       ex['controlcode'] = features['controlcode']
     return ex

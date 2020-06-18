@@ -26,3 +26,13 @@ dist/
 \.pyvenv_local_9/
 
 caet5\.egg-info/
+
+acc_binaries/
+
+ppl_binaries/
+
+caet5/evaluation/__pycache__/
+
+caet5/__pycache__/
+
+caet5/data/__pycache__/
