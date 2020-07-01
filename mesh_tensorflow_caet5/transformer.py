@@ -3,8 +3,8 @@ import tensorflow.compat.v1 as tf
 import mesh_tensorflow as mtf
 # from mesh_tensorflow.transformer import transformer
 # from mesh_tensorflow.transformer.transformer import *
-from mesh_tensorflow.transformer.transformer import make_layer_stack, reduce_ensemble_logits, text2self_inputs_mask, \
-    Context, shift_targets, Unitransformer, Bitransformer
+from mesh_tensorflow.transformer.transformer import make_layer_stack, reduce_ensemble_logits, \
+    delimited_lm_inputs_mask, Context, shift_targets, Unitransformer, Bitransformer
 
 
 @gin.configurable
@@ -241,7 +241,7 @@ class Unitransformer_ll(Unitransformer):
             position_is_default = False
         if self.input_full_attention:
             # The inputs part of each sequence can fully attend within itself.
-            full_attention_region = text2self_inputs_mask(targets)
+            full_attention_region = delimited_lm_inputs_mask(targets)
             # We can include one additional position to the right - the position
             #   where the final EOS of the inputs is read and the first target token
             #   is predicted.
