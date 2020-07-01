@@ -4,66 +4,40 @@ import importlib
 import os
 import sys
 
+from absl import app, flags, logging
 import gin
 import pkg_resources
-from absl import app, flags, logging
+from mesh_tensorflow.transformer import transformer, utils
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
-from mesh_tensorflow.transformer import transformer, utils
 
 from caet5.data.utils import TaskRegistry_ll
 from caet5.evaluation.eval_utils import print_random_predictions
 from caet5.models.mtf_model import MtfModel_ll
-# from mesh_tensorflow_caet5.utils import build_model_ll
 from mesh_tensorflow_caet5.transformer import make_bitransformer_ll
 from mesh_tensorflow_caet5.utils import tpu_estimator_model_fn_ll
 
-flags.DEFINE_multi_string(
-    "module_import", None,
-    "Modules to import. Use this, for example, to add new `Task`s to the "
-    "global `TaskRegistry`.")
+flags.DEFINE_string("tpu_job_name", None,
+                    "Name of TPU worker binary. Only necessary if job name is changed from "
+                    "default tpu_worker.")
 
-flags.DEFINE_string(
-    "use_module_url", "https://tfhub.dev/google/universal-sentence-encoder/2",
-    "Universal Sentence Encoder module URL.")
+flags.DEFINE_string("base_dir", None,
+                    "Base directory for the bucket on GCS, e.g. gs://my-bucket/")
 
-flags.DEFINE_string(
-    "bucket", None,
-    "Name of the Cloud Storage bucket for the data and model checkpoints, e.g. my-bucket")
-
-flags.DEFINE_string(
-    "base_dir", None,
-    "Base directory for the bucket on GCS, e.g. gs://my-bucket/")
-
-flags.DEFINE_string(
-    "data_raw_dir_name", None,
-    "Name of the directory containing data.")
-
-flags.DEFINE_string(
-    "data_dir_name", None,
-    "Name of the directory containing data.")
-
-flags.DEFINE_list(
-    "metrics", ["BLEU", "SIM", "ACC", "PPL"],
-    "Automatic metrics to use when evaluating.")
-
-flags.DEFINE_string(
-    "model_dir_name", "/tmp/transformer_standalone",
-    "Estimator model_dir")
-
-flags.DEFINE_integer(
-    "model_dir_counter", -1,
-    "Counter postpended to model_dir_name. Default to -1 does not postpend anything.")
+flags.DEFINE_string("model_dir_name", "/tmp/transformer_standalone",
+                    "Estimator model_dir")
 
 flags.DEFINE_string(
     "model_size", "small",
     "Model size.")
 
+flags.DEFINE_integer("model_dir_counter", -1,
+                     "Counter postpended to model_dir_name. Default to -1 does not postpend anything.")
 
-flags.DEFINE_string(
-    "tpu", None,
-    "The Cloud TPU to use for training. This should be either the name "
-    "used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 url.")
+
+flags.DEFINE_string("tpu", None,
+                    "The Cloud TPU to use for training. This should be either the name "
+                    "used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 url.")
 
 flags.DEFINE_string(
     "gcp_project",
@@ -76,15 +50,39 @@ flags.DEFINE_string(
     "GCE zone where the Cloud TPU is located in. If not specified, we "
     "will attempt to automatically detect the GCE project from metadata.")
 
+flags.DEFINE_multi_string(
+    "module_import", None,
+    "Modules to import. Use this, for example, to add new `Task`s to the "
+    "global `TaskRegistry`.")
+
+flags.DEFINE_boolean("use_model_api", False,
+                     "Use Model API instead of utils.run.")
+
+flags.DEFINE_enum("mode", None,
+                  ["finetune", "eval", "predict"],
+                  "Mode with which to run the model.")
+
+# Tasks args
+flags.DEFINE_string(
+    "bucket", None,
+    "Name of the Cloud Storage bucket for the data and model checkpoints, e.g. my-bucket")
+
+flags.DEFINE_string(
+    "data_raw_dir_name", None,
+    "Name of the directory containing data.")
+
+flags.DEFINE_string(
+    "data_dir_name", None,
+    "Name of the directory containing data.")
+
 # Train mode args
 flags.DEFINE_integer("train_steps", 1000, "Number of training iterations.")
 
-flags.DEFINE_string("base_pretrained_model_dir", "",
-                    "Pretrained model dir for finetuning a model.")
-
-flags.DEFINE_string("mixture_or_task", "wmt_t2t_ende_v003",
+flags.DEFINE_string("mixture_or_task", "processed_cctk",
                     "Name of Mixture or Task to use for training/evaluation.")
 
+flags.DEFINE_string("base_pretrained_model_dir", "",
+                    "Pretrained model dir for finetuning a model.")
 
 # Eval mode args
 flags.DEFINE_enum(
@@ -100,19 +98,29 @@ flags.DEFINE_list(
     "This argument is only used when which_checkpoint='specific'. "
     "For the 'finetune' mode, only a single checkpoint must be specified.")
 
+flags.DEFINE_string("eval_summary_dir", "", "Path to save eval summaries")
 flags.DEFINE_string("eval_split", "validation",
                     "Dataset split to use for evaluation.")
 
+# Metrics args
+flags.DEFINE_list(
+    "metrics", ["BLEU", "SIM", "ACC", "PPL"],
+    "Automatic metrics to use when evaluating.")
 
-flags.DEFINE_boolean("use_model_api", False,
-                     "Use Model API instead of utils.run.")
+flags.DEFINE_string(
+    "use_module_url", "https://tfhub.dev/google/universal-sentence-encoder/2",
+    "Universal Sentence Encoder module URL.")
 
-flags.DEFINE_enum("mode", None,
-                  ["finetune", "eval", "predict"],
-                  "Mode with which to run the model.")
+# Predict mode args
+flags.DEFINE_string("input_file", "",
+                    "Path to input file for decoding or scoring.")
+flags.DEFINE_string("output_file", "", "Path to output file to save decodes.")
+
+flags.DEFINE_integer("predict_batch_size", -1, "Batch size when predicting.")
 
 
 FLAGS = flags.FLAGS
+
 
 def main(_):
     if FLAGS.module_import:
@@ -129,7 +137,6 @@ def main(_):
     models_dir = os.path.join(FLAGS.base_dir, models_dir_name)
 
     model_dir = os.path.join(models_dir, FLAGS.model_size)
-
     try:
         tf.io.gfile.makedirs(model_dir)
         suffix = 0
@@ -161,7 +168,6 @@ def main(_):
 
     if FLAGS.use_model_api:
         # Modifying original T5 in CAE-T5
-        # utils.build_model = build_model_ll
         transformer.make_bitransformer = make_bitransformer_ll
         utils.tpu_estimator_model_fn = tpu_estimator_model_fn_ll
 
@@ -173,10 +179,11 @@ def main(_):
             "11B": (8, 16, 1)}[FLAGS.model_size]
 
         model = MtfModel_ll(
-            model_dir=model_dir,
+            tpu_job_name=FLAGS.tpu_job_name,
             tpu=FLAGS.tpu,
             gcp_project=FLAGS.gcp_project,
             tpu_zone=FLAGS.tpu_zone,
+            model_dir=model_dir,
             model_parallelism=model_parallelism,
             batch_size=train_batch_size,
             sequence_length=sequence_length,
@@ -216,14 +223,20 @@ def main(_):
             model.eval(
                 mixture_or_task_name=FLAGS.mixture_or_task,
                 checkpoint_steps=checkpoint_steps,
+                summary_dir=FLAGS.eval_summary_dir,
                 split=FLAGS.eval_split
             )
 
             print_random_predictions(FLAGS.mixture_or_task, sequence_length, model_dir, n=10)
 
         elif FLAGS.mode == "predict":
-            TODO
-
+            if FLAGS.predict_batch_size > 0:
+                model.batch_size = FLAGS.predict_batch_size
+            model.predict(
+                checkpoint_steps=checkpoint_steps,
+                input_file=FLAGS.input_file,
+                output_file=FLAGS.output_file,
+                temperature=0)
         else:
             raise ValueError("--mode flag must be set when using Model API.")
 
@@ -231,15 +244,11 @@ def main(_):
         raise NotImplementedError()
 
 
-
-
-
-
-
 def console_entry_point():
     tf.disable_v2_behavior()
     tf.logging.set_verbosity(tf.logging.INFO)
     app.run(main)
+
 
 if __name__ == "__main__":
     console_entry_point()
