@@ -20,90 +20,14 @@ from mesh_tensorflow.transformer.utils import _dynamic_text2self, get_variable_d
     get_step_from_checkpoint_path, decode, get_inputs_from_file, encode_inputs, decode_from_file
 
 from caet5.data.dataset import process_attribute
-from my_mesh_tensorflow_transformer_transformer import Bitransformer_ll, make_bitransformer_ll
-
+from mesh_tensorflow_caet5.transformer import Bitransformer_ll
 
 _INPUT_FEATURES_ll = [
     "inputs", "inputs_position", "inputs_segmentation", "targets",
     "targets_position", "targets_segmentation", "targets_subsegmentation"
 ]
 
-
-def build_model_ll(model_type="bitransformer_ll",
-                   input_vocab_size=gin.REQUIRED,
-                   output_vocab_size=gin.REQUIRED,
-                   layout_rules=None,
-                   mesh_shape=None,
-                   attribute_embedding_encoder=False,
-                   attribute_embedding_decoder=False,
-                   attribute_num=2,
-                   cut_cross_attention=True):
-    """Build a transformer model.
-    Currently, four types of models are supported:
-    "bitransformer": The traditional encoder-decoder architecture from
-       "Attention is All You Need".  Requires a non-text2self dataset.
-    "lm": an autoregressive language model (one layer stack).  Effectively the
-       decoder of the bitransformer. There is no attention over the encoder, since
-       there is no encoder.  Requires a text2self dataset, with targets, but no
-       inputs.
-    "aligned": a non-autoregressive single-stack model (like BERT).  Requires
-       a non-text2self dataset with inputs and targets.  The targets and inputs
-       have the same length and each entry in the inputs is aligned to the
-       corresponding entry in targets, eg:
-        "inputs": "The X sat on X X."
-        'targets": "The cat sat on the mat."
-        (except, inputs are token ID sequences, not strings)
-    "bi_teacher_student": a teacher-student model where both the student and
-      teacher are bitransformers. Requires a non-text2self dataset.
-    A text2self dataset has targets that are offset of the inputs. Non-text2self
-    datasets have targets that differ from their inputs, like:
-      input: 'hello'
-      target: 'bonjour'
-    Args:
-      model_type: a string, one of "bitransformer", "lm", "aligned", or
-        "bi_teacher_student"
-      input_vocab_size: an integer
-      output_vocab_size: an integer
-      layout_rules: optional, input to mtf.convert_to_layout_rules
-      mesh_shape: optional, a function that returns a mtf.Shape
-    Returns:
-      a Unitransformer or Bitransformer
-    """
-    if model_type == "bitransformer":
-        return transformer.make_bitransformer(
-            input_vocab_size=input_vocab_size,
-            output_vocab_size=output_vocab_size,
-            mesh_shape=mesh_shape,
-            layout=layout_rules)
-    elif model_type == "bi_student_teacher":
-        return transformer.make_bi_student_teacher(
-            input_vocab_size=input_vocab_size,
-            output_vocab_size=output_vocab_size,
-            mesh_shape=mesh_shape,
-            layout=layout_rules)
-    elif model_type == "lm" or model_type == "aligned":
-        return transformer.Unitransformer(
-            autoregressive=model_type == "lm",
-            layer_stack=transformer.make_layer_stack(),
-            input_vocab_size=input_vocab_size,
-            output_vocab_size=output_vocab_size,
-            mesh_shape=mesh_shape,
-            layout=layout_rules)
-
-    elif model_type == "bitransformer_ll":
-        return make_bitransformer_ll(
-            input_vocab_size=input_vocab_size,
-            output_vocab_size=output_vocab_size,
-            mesh_shape=mesh_shape,
-            layout=layout_rules,
-            attribute_embedding_encoder=attribute_embedding_encoder,
-            attribute_embedding_decoder=attribute_embedding_decoder,
-            attribute_num=attribute_num,
-            cut_cross_attention=cut_cross_attention)
-    else:
-        raise ValueError("unknown model_type!")
-
-
+# TODO Update with latest version
 @gin.configurable
 def tpu_estimator_model_fn_ll(model_type,
                               transformer_model,
@@ -128,10 +52,10 @@ def tpu_estimator_model_fn_ll(model_type,
                               ensemble_inputs=None,
                               mesh_devices=None,
                               attribute_embedding=False,
-                              has_partial_sequences=True,
-                              remove_partial_sequences=True,
-                              attribute_dependant_prefix_target=True,
-                              cycle_consistency_loss=True,
+                              has_partial_sequences=False,
+                              remove_partial_sequences=False,
+                              control_codes=None,
+                              cycle_consistency_loss=False,
                               lambda_ae=1.0,
                               lambda_cycle=1.0):
     """Create a TPUEstimator model function.
@@ -352,12 +276,12 @@ def tpu_estimator_model_fn_ll(model_type,
             else:
                 inputs = mtf_features["inputs"]
 
-            if style_embedding:
+            if attribute_embedding:
                 styles = mtf_features["style"]
             else:
                 styles = None
 
-            if style_dependant_prefix_target:
+            if control_codes:
                 codeprefixedtargets = mtf_features["codeprefixedtargets"]
             else:
                 codeprefixedtargets = None
@@ -370,7 +294,7 @@ def tpu_estimator_model_fn_ll(model_type,
             elif isinstance(
                     transformer_model,
                     transformer.Bitransformer) or model_type == "bi_student_teacher":
-                if style_dependant_prefix_target:
+                if control_codes:
                     position_kwargs = dict(
                         encoder_sequence_id=mtf_features.get("inputs_segmentation", None),
                         decoder_sequence_id=mtf_features.get("codeprefixedtargets_segmentation",
@@ -399,7 +323,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         inputs=inputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        styles=styles,
+                        attributes=styles,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -410,17 +334,18 @@ def tpu_estimator_model_fn_ll(model_type,
                     else:
                         controlcodes = None
 
-                    mtf_samples = transformer_model.decode(
-                        inputs, attributes=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
-                        remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())
-                    # mtf_samples = mtf.anonymize(mtf_samples)
+                    with gin.config_scope('training'):
+                        mtf_samples = transformer_model.decode(
+                            inputs, attributes=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
+                            remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())
+                        # mtf_samples = mtf.anonymize(mtf_samples)
                     outputs = mtf_samples
 
                     logits_cycle, l_cycle = transformer_model.call_simple(
                         inputs=outputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        styles=styles,
+                        attributes=styles,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -433,7 +358,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         inputs=inputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        styles=styles,
+                        attributes=styles,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -639,8 +564,8 @@ def write_lines_to_file_ll(lines, filename):
 
 def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
                   dataset_split, model_dir, eval_dataset_fn, eval_summary_dir,
-                  eval_checkpoint_step, attribute_bit=True, unsupervised_style_transfer_metrics=True,
-                  style_dependant_prefix_target=True):
+                  eval_checkpoint_step, attribute_bit=True, unsupervised_attribute_transfer_metrics=True,
+                  control_code_bool=False):
     """Eval a Mesh-TF model.
     Args:
       estimator: Estimator object, created with the appropriate model_fn.
@@ -743,7 +668,7 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
     if attribute_bit:
         _INPUT_FEATURES_ll.append("attribute")
 
-    if style_dependant_prefix_target:
+    if control_code_bool:  # TODO check if everything is usefull...
         _INPUT_FEATURES_ll.extend(["controlcode",
                                    "controlcode_position",
                                    "controlcode_segmentation",
@@ -802,7 +727,7 @@ def eval_model_ll(estimator, vocabulary, sequence_length, batch_size,
             for metric_fn in eval_dataset.metric_fns:
                 summary = tf.Summary()
                 targets = cached_targets[eval_dataset.name]
-                if unsupervised_style_transfer_metrics and attribute_bit:
+                if unsupervised_attribute_transfer_metrics and attribute_bit:
                     attributes_origin = cached_attributes_origin[eval_dataset.name]
                     metric_result = metric_fn(targets, predictions, attributes_origin=attributes_origin)
                 else:
@@ -831,10 +756,8 @@ def decode_from_file_ll(estimator,
                         output_filename=gin.REQUIRED,
                         eos_id=1,
                         repeats=1,
-                        target_prefix_style_1="",
-                        target_prefix_style_2="",
-                        style_dependant_prefix_target=True,
-                        style_embedding=False):
+                        control_codes_decode=None,
+                        attribute_embedding=False):
     """Decode from a text file and write to output_filename.
     Args:
       estimator: a TPUEstimator
@@ -855,34 +778,39 @@ def decode_from_file_ll(estimator,
 
     inputs = []
     dst_styles = []
-    controlcodes = []
+    control_code_strings = []
+    #for l in inputs_split:
+    #    inputs.append(l[0])
+    #    dst_attributes.append(l[1])
+    #    if l[1] == "1":
+    #        control_code_strings.append(target_prefix_style_1)
+    #    elif l[1] == "2":
+    #        control_code_strings.append(target_prefix_style_2)
+    #    else:
+    #        control_code_strings.append("")
+
     for l in inputs_split:
         inputs.append(l[0])
         dst_styles.append(l[1])
-        if l[1] == "1":
-            controlcodes.append(target_prefix_style_1)
-        elif l[1] == "2":
-            controlcodes.append(target_prefix_style_2)
-        else:
-            controlcodes.append("")
+        control_code_strings.append(control_codes_decode[int(l[1])])  # TODO: in the old example we shall remove 1...
 
     all_input_ids = encode_inputs(inputs, vocabulary, model_type, batch_size,
                                   sequence_length["inputs"], eos_id=eos_id)
-    if style_dependant_prefix_target:
-        all_controlcode_ids = encode_inputs(controlcodes, vocabulary, "lm", batch_size,
+    if control_codes_decode:
+        all_controlcode_ids = encode_inputs(control_code_strings, vocabulary, "lm", batch_size,
                                            sequence_length["controlcode"], eos_id=eos_id)
 
     def input_fn(params):
         del params
 
         tensors = {"inputs": all_input_ids}
-        if style_embedding:
+        if attribute_embedding:
             tensors["attribute"] = dst_styles
-        if style_dependant_prefix_target:
+        if control_codes_decode:
             tensors["controlcode"] = all_controlcode_ids
 
         dataset = tf.data.Dataset.from_tensor_slices(tensors)
-        if style_embedding:
+        if attribute_embedding:
             dataset = process_attribute(dataset, mode="infer")
         dataset = dataset.flat_map(
             lambda x: tf.data.Dataset.from_tensors(x).repeat(repeats))
@@ -913,10 +841,8 @@ def infer_model_ll(estimator,
                    output_filename=None,
                    checkpoint_paths=None,
                    decode_from_file_fn=decode_from_file,
-                   target_prefix_style_1="",
-                   target_prefix_style_2="",
-                   style_dependant_prefix_target=False,
-                   style_embedding=False):
+                   control_codes_decode=None,
+                   attribute_embedding=False):
   """Infer a Mesh-TF model.
   Args:
     estimator: Estimator object, created with the appropriate model_fn.
@@ -935,12 +861,9 @@ def infer_model_ll(estimator,
     checkpoint_paths: optional list of checkpoints to run inference for
     decode_from_file_fn: decoding function, defaults to decode_from_file
   """
-  if style_dependant_prefix_target or style_embedding:
-      decode_from_file_fn = functools.partial(decode_from_file_ll,
-                                              target_prefix_style_1=target_prefix_style_1,
-                                              target_prefix_style_2=target_prefix_style_2,
-                                              style_dependant_prefix_target=style_dependant_prefix_target,
-                                              style_embedding=style_embedding)
+  if control_codes_decode or attribute_embedding:
+      decode_from_file_fn = functools.partial(decode_from_file_ll, control_codes_decode=control_codes_decode,
+                                              attribute_embedding=attribute_embedding)
 
   if checkpoint_paths is None:
     checkpoint_paths = get_checkpoint_iterator(eval_checkpoint_step, model_dir)

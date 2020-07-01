@@ -12,5 +12,20 @@ Requirements:
 
 To run on TPU: python main.py
 
+# On Colab
+?export PROJECT=your_project_name
+?export ZONE=your_project_zone
+export BASE_DIR=gs://test-t5/ 
+export TPU_NAME="grpc://" + os.environ["COLAB_TPU_ADDR"]
+
+caet5 
+--module_import=caet5.data.tasks
+--bucket=test-t5 
+--base_dir="${BASE_DIR}"
+--data_raw_dir_name=civil_comment_processed 
+--gin_file="dataset.gin"
 --gin_file="objectives/denoise.gin"
+--gin_param="utils.tpu_mesh_shape.tpu_topology = '2x2'"
+--tpu="${TPU_NAME}"
+--model_dir_name=
 

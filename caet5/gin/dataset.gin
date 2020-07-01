@@ -1,7 +1,9 @@
 attribute_bit = True
 target_prefix_attributes = ["civil: ", "toxic: "]
+control_codes = ["toxic: ", "civil: "]
+attribute_num = 2
 
 at_preprocessor.attribute_processing_fn = @attribute_processing_tsv
 at_preprocessor.target_prefix_attributes = %target_prefix_attributes
-at_preprocessor.control_codes = ["toxic: ", "civil: "]
+at_preprocessor.control_codes = %control_codes
 at_preprocessor.attribute_bit = %attribute_bit

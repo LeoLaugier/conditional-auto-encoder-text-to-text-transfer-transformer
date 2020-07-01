@@ -22,7 +22,10 @@ def ensure_dataset_eos_ll(dataset, feature_keys=None):
       num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
 
-def shift_decoder_output_fn(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature_keys=None):
+def shift_decoder_output_fn(dataset, left_pad_amts=None, feature_keys=None):
+  if not left_pad_amts:
+    left_pad_amts = [0, 0]
+
   def _shift_decoder_output(k, t, left_pad_amt):
     if k != "targets":
       return t
@@ -30,9 +33,9 @@ def shift_decoder_output_fn(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature
 
   def map_shift_decoder_output(x):
     attribute = x["attribute"][0]
-    if tf.equal(attribute, 1):
-      return {k: _shift_decoder_output(k, t, left_pad_amt_1) for k, t in x.items()}
-    return {k: _shift_decoder_output(k, t, left_pad_amt_2) for k, t in x.items()}
+    for i in range(len(left_pad_amts)):
+        if tf.equal(attribute, i+1):
+            return {k: _shift_decoder_output(k, t, left_pad_amts[i]) for k, t in x.items()}
 
   return dataset.map(
       lambda x: map_shift_decoder_output(x),
@@ -41,7 +44,7 @@ def shift_decoder_output_fn(dataset, left_pad_amt_1=0, left_pad_amt_2=0, feature
 
 @gin.configurable
 def pack_or_pad_ll(dataset, length, pack=True, feature_keys=None, ensure_eos=False, shift_decoder_output=False,
-                   left_pad_amt_1=0, left_pad_amt_2=0):
+                   target_prefix_attributes=None, tokenizer=None):
   """Creates a 'packed' version of a dataset or pads examples with zeros.
   If pack=True, then multiple examples concatenated to form one combined
   example with the given length.
@@ -60,8 +63,9 @@ def pack_or_pad_ll(dataset, length, pack=True, feature_keys=None, ensure_eos=Fal
   """
   feature_keys = feature_keys or list(dataset.output_shapes.keys())
   if shift_decoder_output:
-    dataset = shift_decoder_output_fn(dataset, left_pad_amt_1=left_pad_amt_1, left_pad_amt_2=left_pad_amt_2,
-                                   feature_keys=feature_keys)
+    left_pad_amts = [len(tokenizer.encode(target_prefix_attribute)) - 1 for target_prefix_attribute in
+                     target_prefix_attributes]
+    dataset = shift_decoder_output_fn(dataset, left_pad_amts=left_pad_amts, feature_keys=feature_keys)
   if pack:
     dataset = pack_dataset(dataset, length=length, keys=feature_keys)
   # Pad/trim length of each example to length.

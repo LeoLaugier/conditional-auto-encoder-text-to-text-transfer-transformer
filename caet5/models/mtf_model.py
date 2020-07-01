@@ -5,29 +5,20 @@ from t5.models.mtf_model import MtfModel
 from t5.models.mtf_model import _get_latest_checkpoint_from_dir, _operative_config_path
 from mesh_tensorflow.transformer import utils
 
-from my_mesh_tensorflow_transformer_utils import eval_model_ll, infer_model_ll, train_model_ll
+from mesh_tensorflow_caet5.utils import eval_model_ll, infer_model_ll, train_model_ll
 from caet5.data.utils import get_mixture_or_task_ll
-from my_t5_models_mesh_transformer import mesh_train_dataset_fn_ll, mesh_eval_dataset_fn_ll
+from caet5.models.mesh_transformer import mesh_train_dataset_fn_ll, mesh_eval_dataset_fn_ll
 
 
 @gin.configurable
 class MtfModel_ll(MtfModel):
-    def __init__(self, *mtfmodel_args, attribute_bit=False, unsupervised_style_transfer_metrics=True,
-                 style_dependant_prefix_target=True, group_by_style=True, attribute_embedding=False, style_num=2,
-                 shift_decoder_output=False, left_pad_amt_1=0, left_pad_amt_2=0, target_prefix_style_1="",
-                 target_prefix_style_2="", **mtfmodel_kwargs):
+    def __init__(self, *mtfmodel_args, attribute_bit=False, unsupervised_attribute_transfer_metrics=True,
+                 control_code_bool=False, group_by_attribute=False, **mtfmodel_kwargs):
         super().__init__(*mtfmodel_args, **mtfmodel_kwargs)
         self.attribute_bit = attribute_bit
-        self.unsupervised_style_transfer_metrics = unsupervised_style_transfer_metrics
-        self.style_dependant_prefix_target = style_dependant_prefix_target
-        self.group_by_style = group_by_style
-        self.attribute_embedding = attribute_embedding
-        self.style_num = style_num
-        self.shift_decoder_output = shift_decoder_output
-        self.left_pad_amt_1 = left_pad_amt_1
-        self.left_pad_amt_2 = left_pad_amt_2
-        self.target_prefix_style_1 = target_prefix_style_1
-        self.target_prefix_style_2 = target_prefix_style_2
+        self.unsupervised_attribute_transfer_metrics = unsupervised_attribute_transfer_metrics
+        self.control_code_bool = control_code_bool
+        self.group_by_attribute = group_by_attribute
 
     def train(self, mixture_or_task_name, steps, init_checkpoint=None,
               split="train"):
@@ -45,19 +36,17 @@ class MtfModel_ll(MtfModel):
             mixture_or_task_name).get_vocabulary()
         dataset_fn = functools.partial(
             mesh_train_dataset_fn_ll, mixture_or_task_name=mixture_or_task_name,
-            batch_size=self.batch_size, ensemble_inputs=self._ensemble_inputs, group_by_style=self.group_by_style,
-            style_embedding=self.attribute_embedding, style_num=self.style_num,
-            shift_decoder_output=self.shift_decoder_output,
-            left_pad_amt_1=self.left_pad_amt_1, left_pad_amt_2=self.left_pad_amt_2)
+            batch_size=self.batch_size, ensemble_inputs=self._ensemble_inputs,
+            group_by_attribute=self.group_by_attribute)
 
-        if self.group_by_style:
+        if self.group_by_attribute:
             train_model_ll(self.estimator(vocabulary, init_checkpoint), vocabulary,
-                              self._sequence_length, self.batch_size, dataset_fn,
-                              steps, self._ensemble_inputs, dataset_split=split)
+                           self._sequence_length, self.batch_size, dataset_fn,
+                           steps, self._ensemble_inputs, dataset_split=split)
         else:
             utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
-                          self._sequence_length, self.batch_size, dataset_fn,
-                          steps, self._ensemble_inputs, dataset_split=split)
+                              self._sequence_length, self.batch_size, dataset_fn,
+                              steps, self._ensemble_inputs, dataset_split=split)
 
     def eval(self, mixture_or_task_name, checkpoint_steps=None, summary_dir=None,
              split="validation"):
@@ -80,18 +69,14 @@ class MtfModel_ll(MtfModel):
         vocabulary = get_mixture_or_task_ll(
             mixture_or_task_name).get_vocabulary()
         dataset_fn = functools.partial(
-            mesh_eval_dataset_fn_ll, mixture_or_task_name=mixture_or_task_name,
-            style_embedding=self.attribute_embedding,
-            shift_decoder_output=self.shift_decoder_output,
-            left_pad_amt_1=self.left_pad_amt_1, left_pad_amt_2=self.left_pad_amt_2)
+            mesh_eval_dataset_fn_ll, mixture_or_task_name=mixture_or_task_name)
         with gin.unlock_config():
             gin.parse_config_file(_operative_config_path(self._model_dir))
         eval_model_ll(self.estimator(vocabulary), vocabulary,
                       self._sequence_length, self.batch_size, split,
-                      self._model_dir, dataset_fn, summary_dir, checkpoint_steps,
-                      attribute_bit=self.attribute_bit,
-                      unsupervised_style_transfer_metrics=self.unsupervised_style_transfer_metrics,
-                      style_dependant_prefix_target=self.style_dependant_prefix_target)
+                      self._model_dir, dataset_fn, summary_dir, checkpoint_steps, attribute_bit=self.attribute_bit,
+                      unsupervised_attribute_transfer_metrics=self.unsupervised_attribute_transfer_metrics,
+                      control_code_bool=self.control_code_bool)
 
     def predict(self, input_file, output_file, checkpoint_steps=-1,
                 beam_size=1, temperature=1.0,
@@ -131,7 +116,4 @@ class MtfModel_ll(MtfModel):
         infer_model_ll(self.estimator(vocabulary), vocabulary,
                        self._sequence_length, self.batch_size,
                        self._model_type, self._model_dir, checkpoint_steps,
-                       input_file, output_file, target_prefix_style_1=self.target_prefix_style_1,
-                       target_prefix_style_2=self.target_prefix_style_2,
-                       style_dependant_prefix_target=self.style_dependant_prefix_target,
-                       style_embedding=self.attribute_embedding)
+                       input_file, output_file)

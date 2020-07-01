@@ -28,13 +28,13 @@ import tensorflow_hub as hub
 from caet5.evaluation.metrics import bleu, kenlm_perplexity, sentence_similarity, \
     fasttext_attribute_accuracy, gpt_perplexity_batch_280, bert_attribute_accuracy_batch
 from caet5.data.dataset import raw_to_tsv, at_preprocessor, raw_to_fasttext_input
-from eval import print_random_predictions
-from my_mesh_tensorflow_transformer_transformer import make_bitransformer_ll, Unitransformer_ll
-from my_mesh_tensorflow_transformer_utils import build_model_ll, tpu_estimator_model_fn_ll
+from caet5.evaluation.eval_utils import print_random_predictions
+from mesh_tensorflow_caet5.transformer import make_bitransformer_ll, Unitransformer_ll
+from mesh_tensorflow_caet5.utils import build_model_ll, tpu_estimator_model_fn_ll
 from caet5.data.preprocessors import denoise
 from caet5.data.utils import TaskRegistry_ll, MixtureRegistry_ll, TfdsTask_ll
 from caet5.evaluation.metrics_utils import download_from_bucket_to_local, upload_blob
-from my_t5_models_mtf_model import MtfModel_ll
+from caet5.models.mtf_model import MtfModel_ll
 
 
 def test_tpu():
@@ -467,11 +467,11 @@ def main():
         iterations_per_loop=100,
         model_type="bitransformer_ll",
         attribute_bit=attribute_BIT,
-        unsupervised_style_transfer_metrics=UNSUPERVISED_STYLE_TRANSFER_METRICS,
-        style_dependant_prefix_target=STYLE_DEPENDANT_PREFIX_TARGET,
-        group_by_style=GROUP_BY_STYLE,
+        unsupervised_attribute_transfer_metrics=UNSUPERVISED_STYLE_TRANSFER_METRICS,
+        control_code_bool=STYLE_DEPENDANT_PREFIX_TARGET,
+        group_by_attribute=GROUP_BY_STYLE,
         attribute_embedding=STYLE_EMBEDDING,
-        style_num=STYLE_NUM,
+        attribute_num=STYLE_NUM,
         shift_decoder_output=SHIFT_DECODER_OUTPUT,
         left_pad_amt_1=left_pad_amt_1,
         left_pad_amt_2=left_pad_amt_2,

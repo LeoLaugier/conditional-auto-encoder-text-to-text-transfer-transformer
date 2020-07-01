@@ -5,15 +5,15 @@ import torch
 from torch.utils.data import Dataset
 
 
-def raw_to_tsv(in_fnames, out_fname, mode="r"):
+def raw_to_tsv(in_fnames, out_fname, mode="r"): # TODO remove mode, set mode="r" by default
   with tf.io.gfile.GFile(out_fname, "w") as outfile:
     for attribute, in_fname in in_fnames:
       with tf.io.gfile.GFile(in_fname, mode) as infile:
         sentences = infile.readlines()
         for sentence in sentences:
           sentence = sentence.rstrip()
-          if mode == "rb":
-            sentence = sentence.decode("utf-8")
+          if mode == "rb": # TODO remove this statement
+            sentence = sentence.decode("utf-8") # TODO remove
           sentence = sentence.replace("\t", "\\t")
           outfile.write("%s\t%s\n" % (sentence, str(attribute)))
 
@@ -39,8 +39,10 @@ def at_preprocessor(ds, attribute_processing_fn, attribute_name="attribute", att
   def normalize_text(text):
     """Lowercase and remove quotes from a TensorFlow string."""
     text = tf.strings.lower(text)
-    text = tf.strings.regex_replace(text, br"\\n", b"\n")
-    text = tf.strings.regex_replace(text, br"\\t", b"\t")
+    #text = tf.strings.regex_replace(text, br"\\n", b"\n")
+    #text = tf.strings.regex_replace(text, br"\\t", b"\t")
+    text = tf.strings.regex_replace(text, r"\\n", "\n")
+    text = tf.strings.regex_replace(text, r"\\t", "\t")
     # text = tf.strings.regex_replace(text,"'(.*)'", r"\1")
 
     return text

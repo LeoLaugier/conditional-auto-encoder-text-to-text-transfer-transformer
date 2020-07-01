@@ -9,16 +9,13 @@ from mesh_tensorflow.transformer.transformer import make_layer_stack, reduce_ens
 
 @gin.configurable
 def make_bitransformer_ll(
-    input_vocab_size=None, #  gin.REQUIRED
-    output_vocab_size=None, # gin.REQUIRED
+    input_vocab_size=gin.REQUIRED,
+    output_vocab_size=gin.REQUIRED,
     layout=None,
     mesh_shape=None,
     encoder_name="encoder",
     decoder_name="decoder",
-    style_embedding_encoder=False,
-    style_embedding_decoder=False,
-    style_num=2,
-    cut_cross_attention=True):
+    cut_cross_attention=False):
   """Gin-configurable bitransformer constructor.
   In your config file you need to set the encoder and decoder layers like this:
   encoder/make_layer_stack.layers = [
@@ -50,82 +47,41 @@ def make_bitransformer_ll(
         autoregressive=False,
         name=encoder_name,
         layout=layout,
-        mesh_shape=mesh_shape,
-        style_embedding=style_embedding_encoder,
-        style_num=style_num)
+        mesh_shape=mesh_shape)
   with gin.config_scope("decoder"):
     if cut_cross_attention:
-        layer_stack = make_layer_stack(layers=[mtf.transformer.transformer_layers.SelfAttention, [mtf.transformer.transformer_layers.DenseReluDense, "layer_002"]])
+        layer_stack = make_layer_stack(layers=[mtf.transformer.transformer_layers.SelfAttention,
+                                               [mtf.transformer.transformer_layers.DenseReluDense, "layer_002"]])
     else:
         layer_stack = make_layer_stack()
+
     decoder = Unitransformer_ll(
-        layer_stack=layer_stack, # TOCLEAN layer_stack=make_layer_stack()
+        layer_stack=layer_stack,
         input_vocab_size=output_vocab_size,
         output_vocab_size=output_vocab_size,
         autoregressive=True,
         name=decoder_name,
         layout=layout,
-        mesh_shape=mesh_shape,
-        style_embedding=style_embedding_decoder,
-        style_num=style_num)
+        mesh_shape=mesh_shape)
   return Bitransformer_ll(encoder, decoder, cut_cross_attention=cut_cross_attention)
 
 
 @gin.configurable
 class Unitransformer_ll(Unitransformer):
-    def __init__(self,
-                 layer_stack,
-                 d_model=1024,
-                 input_vocab_size=gin.REQUIRED,
-                 output_vocab_size=gin.REQUIRED,
-                 autoregressive=gin.REQUIRED,
-                 max_length=gin.REQUIRED,
-                 shared_embedding_and_softmax_weights=False,
-                 label_smoothing=0.0,
-                 z_loss=1e-4,
-                 name="transformer",
-                 layout=None,
-                 mesh_shape=None,
-                 vocab_divisor=128,
-                 ensemble=None,
-                 loss_fn=None,
-                 positional_embedding=True,
-                 input_full_attention=False,
-                 loss_on_targets_only=False,
-                 loss_denominator=None,
-                 style_embedding=False,
-                 style_num=2):
-        super(Unitransformer_ll, self).__init__(layer_stack,
-                                                d_model=d_model,
-                                                input_vocab_size=input_vocab_size,
-                                                output_vocab_size=output_vocab_size,
-                                                autoregressive=autoregressive,
-                                                max_length=max_length,
-                                                shared_embedding_and_softmax_weights=shared_embedding_and_softmax_weights,
-                                                label_smoothing=label_smoothing,
-                                                z_loss=z_loss,
-                                                name=name,
-                                                layout=layout,
-                                                mesh_shape=mesh_shape,
-                                                vocab_divisor=vocab_divisor,
-                                                ensemble=ensemble,
-                                                loss_fn=loss_fn,
-                                                positional_embedding=positional_embedding,
-                                                input_full_attention=input_full_attention,
-                                                loss_on_targets_only=loss_on_targets_only,
-                                                loss_denominator=loss_denominator)
-        self.style_embedding = style_embedding
-        self.style_dim = mtf.Dimension("style",
-                                       style_num + 1)  # style_num + 1 because we add style 0, a "padding" style (necessary because of the way T5 pre-processes datasets...)
+    def __init__(self, *unitransformer_args, attribute_embedding=False, attribute_num=2, **unitransformer_kwargs):
+        super().__init__(*unitransformer_args, **unitransformer_kwargs)
+        self.attribute_embedding = attribute_embedding
+        self.attribute_dim = mtf.Dimension("attribute",
+                                           attribute_num + 1)  # attribute_num + 1 because we add attribute 0, a "padding" attribute (necessary because of the way T5 pre-processes datasets...)
 
-    def _call_internal(self, context, inputs, targets=None, styles=None, z=None):
+    def _call_internal(self, context, inputs, targets=None, attributes=None, z=None):
         """Compute logits based on inputs (all positions in parallel).
         Also updates context if applicable.
         Args:
           context: a Context
           inputs: a Tensor
           targets: an optional Tensor
-          styles: an optional Tensor
+          attributes: an optional Tensor
         Returns:g
           logits: a Tensor with shape [<batch_dims>, length_dim, output_vocab_dim]
         """
@@ -133,8 +89,8 @@ class Unitransformer_ll(Unitransformer):
         if self.ensemble_dim and self.ensemble_dim not in inputs.shape.dims:
             # Training an ensemble where all models are trained on the same examples.
             inputs = mtf.broadcast(inputs, [self.ensemble_dim] + inputs.shape.dims)
-            if self.ensemble_dim not in styles.shape.dims:
-                styles = mtf.broadcast(styles, [self.ensemble_dim] + styles.shape.dims)
+            if self.ensemble_dim not in attributes.shape.dims:
+                attributes = mtf.broadcast(attributes, [self.ensemble_dim] + attributes.shape.dims)
             if targets:
                 targets = mtf.broadcast(
                     targets, [self.ensemble_dim] + targets.shape.dims)
@@ -181,25 +137,25 @@ class Unitransformer_ll(Unitransformer):
                     output_shape=x.shape)
             x += pos_emb
 
-        if self.style_embedding:
+        if self.attribute_embedding:
             if "attribute_embedding" in context.shared_params:
                 sty_emb_var = context.shared_params["attribute_embedding"]
             else:
                 sty_emb_var = mtf.layers.embedding_weights(
-                    mesh, self.style_dim, self.model_dim, context.variable_dtype,
+                    mesh, self.attribute_dim, self.model_dim, context.variable_dtype,
                     "attribute_embedding", ensemble_dim=self.ensemble_dim)
 
             sty_emb = mtf.gather(
-                sty_emb_var, styles, self.style_dim,
+                sty_emb_var, attributes, self.attribute_dim,
                 output_shape=x.shape)
-            # Addition of x and style
-            # x *= LAMBDA_STYLE * sty_emb #
+            # Addition of x and attribute
+            # x *= LAMBDA_ATTRIBUTE * sty_emb #
 
-            # Concatenation of x and style
-            x_style = mtf.concat([x, sty_emb], self.model_dim.name)
+            # Concatenation of x and attribute
+            x_attribute = mtf.concat([x, sty_emb], self.model_dim.name)
             x = mtf.layers.dense(
-                x_style, self.model_dim, activation=None, variable_dtype=context.variable_dtype,
-                name="comb_x_style")
+                x_attribute, self.model_dim, activation=None, variable_dtype=context.variable_dtype,
+                name="comb_x_attribute")
 
         if z:
             z = mtf.layers.dense(
@@ -231,7 +187,7 @@ class Unitransformer_ll(Unitransformer):
                     inputs,
                     targets,
                     compute_loss,
-                    styles=None,
+                    attributes=None,
                     mode=tf.estimator.ModeKeys.TRAIN,
                     variable_dtype=mtf.VariableDType(tf.float32),
                     sequence_id=None,
@@ -252,7 +208,7 @@ class Unitransformer_ll(Unitransformer):
             offset=1, dim=length_dim, wrap=False)
           targets: an optional int32 Tensor with shape [<batch_dims>, length_dim]
           compute_loss: a boolean
-          styles: an (optional?) int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
+          attributes: an (optional?) int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
           mode: a tf.estimator.ModeKeys
           variable_dtype: a mtf.VariableDType
           sequence_id: an optional Tensor
@@ -324,7 +280,7 @@ class Unitransformer_ll(Unitransformer):
             inputs=inputs,
             encoder_inputs=encoder_inputs)
         with tf.variable_scope(self.name):
-            logits = self._call_internal(context, inputs, targets, styles, z=z)
+            logits = self._call_internal(context, inputs, targets, attributes, z=z)
         if compute_loss:
             loss = mtf.add_n(context.losses)
         else:
@@ -334,7 +290,7 @@ class Unitransformer_ll(Unitransformer):
     @gin.configurable(module="Unitransformer_ll")
     def sample_autoregressive(self,
                               partial_sequences,
-                              dst_styles=None,
+                              dst_attributes=None,
                               stop_at_token=1,
                               max_steps=None,
                               temperature=0.0,
@@ -357,10 +313,10 @@ class Unitransformer_ll(Unitransformer):
         If there are no partial sequences (you want to sample from the beginning),
         then pass partial_sequences=mtf.zeros(mesh, shape, dtype=tf.int32) and
         has_partial_sequences=False (so we can skip computation).
-        The dst_styles represents the destination attributes in which we want to generate sequences.
+        The dst_attributes represents the destination attributes in which we want to generate sequences.
         Args:
           partial_sequences: an int32 Tensor with shape [<batch_dims>, length_dim]
-          dst_style: an int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
+          dst_attribute: an int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
           stop_at_token: an optional integer eos id.  Stop when we produce it.
           max_steps: an optional integer, the max number of steps to decode.
           temperature: an optional floating point value between 0.0 and 1.0 0.0
@@ -385,7 +341,7 @@ class Unitransformer_ll(Unitransformer):
             raise ValueError("must be autoregressive")
 
         inputs = partial_sequences
-        styles = dst_styles
+        attributes = dst_attributes
         batch_dims = inputs.shape.dims[:-1]
         length_dim = inputs.shape.dims[-1]
         initial_position = mtf.reduce_sum(
@@ -423,7 +379,7 @@ class Unitransformer_ll(Unitransformer):
 
         shifted_inputs = mtf.shift(inputs, offset=1, dim=length_dim, wrap=False)
         with tf.variable_scope(self.name):
-            logits = self._call_internal(context_first_part, shifted_inputs, styles=styles,
+            logits = self._call_internal(context_first_part, shifted_inputs, attributes=attributes,
                                          z=z)
         del logits
         constant_states = context_first_part.constant_states
@@ -457,10 +413,10 @@ class Unitransformer_ll(Unitransformer):
         def body_fn(position, ids, *states):
             """One step in the decode loop."""
             inputs_this_step = mtf.gather(ids, position - 1, length_dim)
-            if self.style_embedding:
-                styles_this_step = mtf.gather(styles, position - 1, length_dim)
+            if self.attribute_embedding:
+                attributes_this_step = mtf.gather(attributes, position - 1, length_dim)
             else:
-                styles_this_step = None
+                attributes_this_step = None
             # raise ValueError("inputs_this_step shape=%s , ids shape=%s, position - 1 shape=%s, length_dim=%s" % (inputs_this_step.shape, ids.shape, (position - 1).shape, length_dim))
             context_incremental = Context(
                 model=self,
@@ -484,7 +440,7 @@ class Unitransformer_ll(Unitransformer):
                 encoder_inputs=encoder_inputs)
 
             with tf.variable_scope(self.name, reuse=True):
-                logits = self._call_internal(context_incremental, inputs_this_step, styles=styles_this_step,
+                logits = self._call_internal(context_incremental, inputs_this_step, attributes=attributes_this_step,
                                              z=z)
                 if never_end:
                     logits += mtf.one_hot(
@@ -529,7 +485,7 @@ class Unitransformer_ll(Unitransformer):
     def beam_search(self,
                     inputs,
                     decode_length,
-                    dst_styles=None,
+                    dst_attributes=None,
                     variable_dtype=mtf.VariableDType(tf.float32),
                     encoder_output=None,
                     encoder_sequence_id=None,
@@ -557,7 +513,7 @@ class Unitransformer_ll(Unitransformer):
         Returns:
           a Tensor with shape [<batch_dims>, beam_dim, length_dim]
         """
-        styles = dst_styles
+        attributes = dst_attributes
         if not self.autoregressive:
             raise ValueError("must be autoregressive")
 
@@ -605,7 +561,7 @@ class Unitransformer_ll(Unitransformer):
 
         shifted_inputs = mtf.shift(inputs, offset=1, dim=length_dim, wrap=False)
         with tf.variable_scope(self.name):
-            logits = self._call_internal(context_first_part, shifted_inputs, styles=styles,
+            logits = self._call_internal(context_first_part, shifted_inputs, attributes=attributes,
                                          z=z)
         del logits
         # There are no partial targets.
@@ -617,10 +573,10 @@ class Unitransformer_ll(Unitransformer):
             """logits_fn for mtf.beam_search.beam_search()."""
             inputs_this_step = mtf.gather(ids, step_num - 1, length_dim)
 
-            if self.style_embedding:
-                styles_this_step = mtf.gather(styles, step_num - 1, length_dim)
+            if self.attribute_embedding:
+                attributes_this_step = mtf.gather(attributes, step_num - 1, length_dim)
             else:
-                styles_this_step = None
+                attributes_this_step = None
 
             context_incremental = Context(
                 model=self,
@@ -643,7 +599,7 @@ class Unitransformer_ll(Unitransformer):
                 inputs=inputs_this_step,
                 encoder_inputs=encoder_inputs)
             with tf.variable_scope(self.name, reuse=True):
-                logits = self._call_internal(context_incremental, inputs_this_step, styles=styles_this_step,
+                logits = self._call_internal(context_incremental, inputs_this_step, attributes=attributes_this_step,
                                              z=z)
             return mtf.to_float(logits), context_incremental.new_states
 
@@ -686,9 +642,8 @@ def shift_targets_no_offset(targets, bos_id=0, eos_id=1):
   return shifted_targets
 
 
-@gin.configurable
 class Bitransformer_ll(Bitransformer):
-    def __init__(self, *bitransformer_args, cut_cross_attention=True, **bitransformer_kwargs):
+    def __init__(self, *bitransformer_args, cut_cross_attention=False, **bitransformer_kwargs):
         super().__init__(*bitransformer_args, **bitransformer_kwargs)
         self.cut_cross_attention = cut_cross_attention
 
@@ -722,10 +677,10 @@ class Bitransformer_ll(Bitransformer):
                         mesh, self.encoder.max_length_dim, self.encoder.model_dim,
                         variable_dtype, "positional_embedding",
                         ensemble_dim=self.encoder.ensemble_dim)
-                if (self.encoder.style_embedding
-                        and self.decoder.style_embedding):
+                if (self.encoder.attribute_embedding
+                        and self.decoder.attribute_embedding):
                     shared_params["attribute_embedding"] = mtf.layers.embedding_weights(
-                        mesh, self.encoder.style_dim, self.encoder.model_dim,
+                        mesh, self.encoder.attribute_dim, self.encoder.model_dim,
                         variable_dtype, "attribute_embedding",
                         ensemble_dim=self.encoder.ensemble_dim)
         return shared_params
@@ -734,7 +689,7 @@ class Bitransformer_ll(Bitransformer):
                     inputs,
                     targets,
                     compute_loss,
-                    styles=None,
+                    attributes=None,
                     codeprefixedtargets=None,
                     mode=tf.estimator.ModeKeys.TRAIN,
                     variable_dtype=mtf.VariableDType(tf.float32),
@@ -749,7 +704,7 @@ class Bitransformer_ll(Bitransformer):
           inputs: an int32 Tensor with shape [<batch_dims>, length_dim]
           targets: an optional int32 Tensor with shape [<batch_dims>, length_dim]
           compute_loss: a boolean
-          styles: an (optional?) int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
+          attributes: an (optional?) int32 Tensor with shape [<batch_dims>, length_dim] ([<batch_dims>])
           mode: a tf.estimator.ModeKeys
           variable_dtype: a mtf.VariableDType
           encoder_sequence_id: an optional Tensor
@@ -767,7 +722,7 @@ class Bitransformer_ll(Bitransformer):
             inputs,
             None,
             compute_loss,
-            styles=styles,
+            attributes=attributes,
             mode=mode,
             variable_dtype=variable_dtype,
             sequence_id=encoder_sequence_id,
@@ -789,7 +744,7 @@ class Bitransformer_ll(Bitransformer):
 
         if codeprefixedtargets:
             decoder_input = shift_targets_no_offset(
-                codeprefixedtargets)  # shift_style_targets(targets, style_id=codeprefixedtargets), # codeprefixedtargets # mtf.zeros_like(targets)
+                codeprefixedtargets)  # shift_attribute_targets(targets, attribute_id=codeprefixedtargets), # codeprefixedtargets # mtf.zeros_like(targets)
         else:
             decoder_input = shift_targets(targets)
 
@@ -799,7 +754,7 @@ class Bitransformer_ll(Bitransformer):
             decoder_input,
             targets,
             compute_loss,
-            styles=styles,
+            attributes=attributes,
             mode=mode,
             variable_dtype=variable_dtype,
             sequence_id=decoder_sequence_id,
@@ -828,8 +783,8 @@ class Bitransformer_ll(Bitransformer):
                decode_length_multiplier=1.5,
                decode_length_constant=10,
                max_decode_length=None,
-               has_partial_sequences=True,
-               remove_partial_sequences=True):
+               has_partial_sequences=False,
+               remove_partial_sequences=False):
         """Sampling or beam search.
         TODO(noam): should we make the output length dimension different from the
         input length dimension?
@@ -856,7 +811,7 @@ class Bitransformer_ll(Bitransformer):
             inputs=inputs,
             targets=None,
             compute_loss=False,
-            styles=attributes,
+            attributes=attributes,
             mode=tf.estimator.ModeKeys.PREDICT,
             variable_dtype=variable_dtype,
             sequence_id=encoder_sequence_id,
@@ -895,7 +850,7 @@ class Bitransformer_ll(Bitransformer):
         if beam_size == 1:
             return self.decoder.sample_autoregressive(
                 partial_sequences,
-                dst_styles=attributes,
+                dst_attributes=attributes,
                 temperature=temperature,
                 variable_dtype=variable_dtype,
                 encoder_output=encoder_output,
@@ -922,7 +877,7 @@ class Bitransformer_ll(Bitransformer):
             return self.decoder.beam_search(
                 partial_sequences,
                 decode_length,
-                dst_styles=attributes,
+                dst_attributes=attributes,
                 variable_dtype=variable_dtype,
                 encoder_output=encoder_output,
                 encoder_sequence_id=encoder_sequence_id,
@@ -933,7 +888,7 @@ class Bitransformer_ll(Bitransformer):
                 z=z)
 
 
-# /!\ This is needed since the last commit was on Dec 9 and the last version on Pypi was 0.1.7 on Dec 6
+# /!\ This is needed since the last commit was on Dec 9 and the last version on Pypi was 0.1.7 on Dec 6 #TODO Update
 @gin.configurable
 class VocabEmbedding(object):
   """A class to go from vocab ids to model states and model states to logits."""
