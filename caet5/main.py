@@ -192,7 +192,7 @@ def main(_):
             keep_checkpoint_max=keep_checkpoint_max,  # if ON_CLOUD else None,
             iterations_per_loop=100,
             model_type="bitransformer",
-            unsupervised_style_transfer_metrics=True
+            unsupervised_attribute_transfer_metrics=True
         )
 
         if FLAGS.checkpoint_mode != "specific" and FLAGS.checkpoint_steps:
