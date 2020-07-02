@@ -2,7 +2,6 @@ include 'dataset.gin'
 # import caet5.models.mtf_model
 
 MtfModel_ll.attribute_bit = %attribute_bit
-MtfModel_ll.control_codes = %control_codes
 MtfModel_ll.group_by_attribute = True
 MtfModel_ll.control_code_bool = True
 
