@@ -186,7 +186,6 @@ def main(_):
             model_dir=model_dir,
             model_parallelism=model_parallelism,
             batch_size=train_batch_size,
-            sequence_length=sequence_length,
             learning_rate_schedule=0.003,
             save_checkpoints_steps=2000,
             keep_checkpoint_max=keep_checkpoint_max,  # if ON_CLOUD else None,
