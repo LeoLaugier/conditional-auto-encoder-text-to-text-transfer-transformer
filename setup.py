@@ -23,6 +23,9 @@ setuptools.setup(
     url='https://github.com/LeoLaugier/self_supervised_t5_style_transfer', # TODO
     # license='Apache 2.0', # TODO
     packages=setuptools.find_packages(),
+    package_data={
+        '': ['*.gin'],
+    },
     scripts=[],
     install_requires=[ #TODO Update CAET5 to fit last versions of transformers and t5
         #"tensorflow",

@@ -1,5 +1,3 @@
-# -*-Python-*-
-
 attribute_bit = True
 target_prefix_attributes = ["civil: ", "toxic: "]
 control_codes = ["toxic: ", "civil: "]
