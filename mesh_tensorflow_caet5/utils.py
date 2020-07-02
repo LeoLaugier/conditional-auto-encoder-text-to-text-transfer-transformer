@@ -186,7 +186,7 @@ def tpu_estimator_model_fn_ll(model_type,
             inputs = mtf_features["inputs"]
 
             if attribute_embedding:
-                attributes = mtf_features["style"]
+                attributes = mtf_features["attribute"]
             else:
                 attributes = None
 
@@ -277,9 +277,9 @@ def tpu_estimator_model_fn_ll(model_type,
                 inputs = mtf_features["inputs"]
 
             if attribute_embedding:
-                styles = mtf_features["style"]
+                attributes = mtf_features["attribute"]
             else:
-                styles = None
+                attributes = None
 
             if control_codes:
                 codeprefixedtargets = mtf_features["codeprefixedtargets"]
@@ -323,7 +323,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         inputs=inputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        attributes=styles,
+                        attributes=attributes,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -336,7 +336,7 @@ def tpu_estimator_model_fn_ll(model_type,
 
                     with gin.config_scope('training'):
                         mtf_samples = transformer_model.decode(
-                            inputs, attributes=styles, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
+                            inputs, attributes=attributes, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
                             remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())
                         # mtf_samples = mtf.anonymize(mtf_samples)
                     outputs = mtf_samples
@@ -345,7 +345,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         inputs=outputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        attributes=styles,
+                        attributes=attributes,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -358,7 +358,7 @@ def tpu_estimator_model_fn_ll(model_type,
                         inputs=inputs,
                         targets=mtf_features["targets"],
                         compute_loss=True,
-                        attributes=styles,
+                        attributes=attributes,
                         codeprefixedtargets=codeprefixedtargets,
                         mode=mode,
                         variable_dtype=get_variable_dtype(),
@@ -772,12 +772,12 @@ def decode_from_file_ll(estimator,
       eos_id: EOS id
       repeats: an integer, the number of times to repeat each input.
     """
-    inputs_and_dst_styles = get_inputs_from_file(input_filename)
+    inputs_and_dst_attributes = get_inputs_from_file(input_filename)
 
-    inputs_split = [line.split("|dst_style:") for line in inputs_and_dst_styles]
+    inputs_split = [line.split("|dst_attribute:") for line in inputs_and_dst_attributes]
 
     inputs = []
-    dst_styles = []
+    dst_attributes = []
     control_code_strings = []
     #for l in inputs_split:
     #    inputs.append(l[0])
@@ -791,7 +791,7 @@ def decode_from_file_ll(estimator,
 
     for l in inputs_split:
         inputs.append(l[0])
-        dst_styles.append(l[1])
+        dst_attributes.append(l[1])
         control_code_strings.append(control_codes_decode[int(l[1])])  # TODO: in the old example we shall remove 1...
 
     all_input_ids = encode_inputs(inputs, vocabulary, model_type, batch_size,
@@ -805,7 +805,7 @@ def decode_from_file_ll(estimator,
 
         tensors = {"inputs": all_input_ids}
         if attribute_embedding:
-            tensors["attribute"] = dst_styles
+            tensors["attribute"] = dst_attributes
         if control_codes_decode:
             tensors["controlcode"] = all_controlcode_ids
 
