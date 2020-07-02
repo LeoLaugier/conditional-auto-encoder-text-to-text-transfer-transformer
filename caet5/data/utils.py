@@ -1,10 +1,13 @@
 import functools
 
+import gin
 from absl import logging
 import t5
+from t5.data import sentencepiece_vocabulary
 from t5.data.utils import _DEFAULT_FEATURE_KEYS, _VALID_TASK_NAME_REGEX, _INFO_FILENAME, _STATS_FILENAME, \
     _TFRECORD_PREFIX, _MAX_EXAMPLES_TO_MEM_CACHE, _SHUFFLE_BUFFER_SIZE, _TFDS_DATA_DIR_OVERRIDE, \
-    _GLOBAL_CACHE_DIRECTORIES, encode_string_features, DatasetProviderRegistry, TfdsTask, DatasetProviderBase
+    _GLOBAL_CACHE_DIRECTORIES, encode_string_features, DatasetProviderRegistry, TfdsTask, DatasetProviderBase, \
+    DEFAULT_SPM_PATH
 # from t5.data.utils import *
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
@@ -16,6 +19,10 @@ def balance_fn(x, balance_rate=0):
         return draw < balance_rate
     else:
         return True
+
+@gin.configurable
+def get_default_vocabulary():
+  return sentencepiece_vocabulary.SentencePieceVocabulary(DEFAULT_SPM_PATH) # TODO update with latest t5 version
 
 
 # Need to redefine TfdsTask because Task was not made to process non string inputs

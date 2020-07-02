@@ -11,6 +11,6 @@ mesh_train_dataset_fn_ll.attribute_num = %attribute_num
 pack_or_pad_ll.shift_decoder_output = True
 pack_or_pad_ll.target_prefix_attributes = %target_prefix_attributes
 # pack_or_pad_ll.tokenizer = @t5.data.sentencepiece_vocabulary.SentencePieceVocabulary(@t5.data.DEFAULT_SPM_PATH)
-pack_or_pad_ll.tokenizer = @t5.data.utils.get_default_vocabulary()
+pack_or_pad_ll.tokenizer = @get_default_vocabulary()
 
 make_bitransformer_ll.cut_cross_attention = True
