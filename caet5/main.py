@@ -173,7 +173,7 @@ def main(_):
 
     dsbis = mixture_or_task.get_dataset(
         sequence_length, split="validation", use_cached=False, shuffle=True)
-    
+
     output_features = ["inputs", "targets", "attribute", "codeprefixedtargets", "controlcode"]
     ds2 = pack_or_pad_ll(
         dsbis, sequence_length, pack=True,
@@ -236,8 +236,10 @@ def main(_):
 
         elif FLAGS.mode == "eval":
             model.batch_size = train_batch_size * 4
+            pretrained_dir = os.path.join(FLAGS.base_pretrained_model_dir, FLAGS.model_size)
             model.eval(
                 mixture_or_task_name=FLAGS.mixture_or_task,
+                pretrained_model_dir=pretrained_dir,
                 checkpoint_steps=checkpoint_steps,
                 summary_dir=FLAGS.eval_summary_dir,
                 split=FLAGS.eval_split
