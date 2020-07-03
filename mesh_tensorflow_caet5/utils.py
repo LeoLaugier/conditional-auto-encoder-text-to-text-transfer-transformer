@@ -191,9 +191,9 @@ def tpu_estimator_model_fn_ll(model_type,
                 attributes = None
 
             if has_partial_sequences:
-                controlcode = mtf_features["controlcode"]
+                controlcodes = mtf_features["controlcode"]
             else:
-                controlcode = None
+                controlcodes = None
 
             if predict_fn:
                 mtf_samples = predict_fn(
@@ -210,7 +210,7 @@ def tpu_estimator_model_fn_ll(model_type,
             elif isinstance(transformer_model,
                             Bitransformer_ll):
                 mtf_samples = transformer_model.decode(
-                    inputs, attributes=attributes, controlcodes=controlcode, has_partial_sequences=has_partial_sequences,
+                    inputs, attributes=attributes, controlcodes=controlcodes, has_partial_sequences=has_partial_sequences,
                     remove_partial_sequences=remove_partial_sequences, variable_dtype=get_variable_dtype())  #
             elif isinstance(transformer_model,
                             (transformer.Bitransformer, transformer.StudentTeacher)):

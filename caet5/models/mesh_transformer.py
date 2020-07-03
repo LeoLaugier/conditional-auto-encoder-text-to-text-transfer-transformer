@@ -21,7 +21,7 @@ def mesh_train_dataset_fn_ll(
         ensemble_inputs,
         dataset_split=tfds.Split.TRAIN,
         use_cached=False,
-        group_by_attribute=True,
+        group_by_attribute=False,
         attribute_embedding=False,
         attribute_num=2):
     """Returns the tf.data.Dataset for training on a given mixture.
@@ -92,6 +92,11 @@ def mesh_train_dataset_fn_ll(
             ds, sequence_length, pack=True,
             feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
         ds = process_attribute(ds)
+
+    print("A few preprocessed validation examples...")
+    for ex in tfds.as_numpy(ds.take(5)):
+        print(ex)
+
     return ds
 
 
