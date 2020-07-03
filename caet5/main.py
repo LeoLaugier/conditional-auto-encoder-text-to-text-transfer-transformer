@@ -214,7 +214,7 @@ def main(_):
             model.finetune(
                 mixture_or_task_name=FLAGS.mixture_or_task,
                 pretrained_model_dir=pretrained_dir,
-                finetune_steps=FLAGS.train_steps
+                finetune_steps=1000
             )
 
         elif FLAGS.mode == "eval":
