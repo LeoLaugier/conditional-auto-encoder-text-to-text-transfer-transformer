@@ -168,19 +168,28 @@ def main(_):
         print(ex)
 
     print("unitests")
+
     mixture_or_task_name = "processed_cctk"
     from caet5.models.mesh_transformer import mesh_train_dataset_fn_ll
     from caet5.data.utils import get_mixture_or_task_ll
-
+    """
     vocabulary = get_mixture_or_task_ll(
         mixture_or_task_name).get_vocabulary()
     with gin.config_scope('caet5'):
         ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
                                    batch_size=4, ensemble_inputs=1, group_by_attribute=True)
+    """
+    from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
+    mixture_or_task = get_mixture_or_task_ll(mixture_or_task_name)
+    print(tuple(mixture_or_task.output_features))
+    ds2 = pack_or_pad_ll(ds, sequence_length, pack=False,
+                         feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
 
     print("A few preprocessed validation examples...")
     for ex in tfds.as_numpy(ds2.take(5)):
         print(ex)
+
+
 
 
     if FLAGS.use_model_api:
