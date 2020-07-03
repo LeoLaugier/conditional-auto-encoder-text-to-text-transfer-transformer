@@ -160,7 +160,8 @@ def main(_):
     sequence_length["codeprefixedtargets"] = 64
     sequence_length["controlcode"] = 64
 
-    ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
+    with gin.config_scope('caet5'):
+        ds = st_task.get_dataset(split="validation", sequence_length=sequence_length)
 
     print("A few preprocessed validation examples...")
     for ex in tfds.as_numpy(ds.take(5)):
@@ -214,7 +215,7 @@ def main(_):
             model.finetune(
                 mixture_or_task_name=FLAGS.mixture_or_task,
                 pretrained_model_dir=pretrained_dir,
-                finetune_steps=1000
+                finetune_steps=FLAGS.train_steps
             )
 
         elif FLAGS.mode == "eval":
