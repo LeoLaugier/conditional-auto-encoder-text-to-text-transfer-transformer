@@ -43,6 +43,8 @@ class MtfModel_ll(MtfModel):
         # with different values than the gin parameter values from the pre-trained gin config. e.g.
         # t5.data.preprocessors.unsupervised.preprocessors.
         with gin.config_scope('caet5'):
+            print(steps)
+            print(type(steps))
             if self.group_by_attribute:
                 train_model_ll(self.estimator(vocabulary, init_checkpoint), vocabulary,
                                self._sequence_length, self.batch_size, dataset_fn,
