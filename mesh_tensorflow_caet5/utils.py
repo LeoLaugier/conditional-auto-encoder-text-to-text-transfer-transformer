@@ -5,7 +5,7 @@ import gin
 import re
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 # from mesh_tensorflow.transformer.utils import *
 from tensorflow.python.ops import resources  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.tpu import tpu_estimator  # pylint: disable=g-direct-tensorflow-import
