@@ -93,10 +93,6 @@ def mesh_train_dataset_fn_ll(
             feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
         ds = process_attribute(ds)
 
-    print("A few preprocessed validation examples...")
-    for ex in tfds.as_numpy(ds.take(5)):
-        print(ex)
-
     return ds
 
 
