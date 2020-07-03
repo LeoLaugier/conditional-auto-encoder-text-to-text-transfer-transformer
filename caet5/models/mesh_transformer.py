@@ -44,8 +44,9 @@ def mesh_train_dataset_fn_ll(
 
     mixture_or_task = get_mixture_or_task_ll(mixture_or_task_name)
 
-    ds = mixture_or_task.get_dataset(
-        sequence_length, split=dataset_split, use_cached=use_cached, shuffle=True)
+    with gin.config_scope('caet5'):
+        ds = mixture_or_task.get_dataset(
+            sequence_length, split=dataset_split, use_cached=use_cached, shuffle=True)
 
     if group_by_attribute:  # TODO: Currently, we alternate deterministically batches of same attribute but it would be even better to alternate randomly
         def filter_attribute_1_fn(x):
