@@ -187,10 +187,12 @@ def main(_):
         default_rate=1.0
     )
 
-    with gin.config_scope('caet5'):
-        mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
+    mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
 
-    ds2 = pack_or_pad_ll(ds, sequence_length, pack=False,
+    with gin.config_scope('caet5'):
+        dsbis = mixture_or_task.get_dataset(split="validation", sequence_length=sequence_length)
+
+    ds2 = pack_or_pad_ll(dsbis, sequence_length, pack=False,
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
 
     print("A few preprocessed validation examples...")
