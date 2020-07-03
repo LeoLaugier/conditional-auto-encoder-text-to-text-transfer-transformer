@@ -11,10 +11,9 @@ from mesh_tensorflow.transformer import transformer, utils
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
 
-from caet5.data.utils import TaskRegistry_ll, get_mixture_or_task_ll
+from caet5.data.utils import TaskRegistry_ll
 from caet5.evaluation.eval_utils import print_random_predictions
 from caet5.models.mtf_model import MtfModel_ll
-from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
 from mesh_tensorflow_caet5.transformer import make_bitransformer_ll
 from mesh_tensorflow_caet5.utils import tpu_estimator_model_fn_ll
 
@@ -168,18 +167,18 @@ def main(_):
     for ex in tfds.as_numpy(ds.take(5)):
         print(ex)
 
-    print("unitest")
-    mixture_or_task = get_mixture_or_task_ll("processed_cctk")
+    print("unitests")
+    mixture_or_task_name = "processed_cctk"
+    from caet5.models.mesh_transformer import mesh_train_dataset_fn_ll
+    from caet5.data.utils import get_mixture_or_task_ll
 
-    dsbis = mixture_or_task.get_dataset(
-        sequence_length, split="validation", use_cached=False, shuffle=True)
+    vocabulary = get_mixture_or_task_ll(
+        mixture_or_task_name).get_vocabulary()
+    ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
+                                   batch_size=4, ensemble_inputs=1, group_by_attribute=True)
 
-    output_features = ["inputs", "targets", "attribute", "codeprefixedtargets", "controlcode"]
-    ds2 = pack_or_pad_ll(
-        dsbis, sequence_length, pack=True,
-        feature_keys=tuple(output_features), ensure_eos=True)  # pack = True
-
-    for ex in tfds.as_numpy(ds2.take(15)):
+    print("A few preprocessed validation examples...")
+    for ex in tfds.as_numpy(ds2.take(5)):
         print(ex)
 
 
@@ -236,10 +235,8 @@ def main(_):
 
         elif FLAGS.mode == "eval":
             model.batch_size = train_batch_size * 4
-            pretrained_dir = os.path.join(FLAGS.base_pretrained_model_dir, FLAGS.model_size)
             model.eval(
                 mixture_or_task_name=FLAGS.mixture_or_task,
-                pretrained_model_dir=pretrained_dir,
                 checkpoint_steps=checkpoint_steps,
                 summary_dir=FLAGS.eval_summary_dir,
                 split=FLAGS.eval_split
