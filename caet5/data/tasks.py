@@ -16,7 +16,7 @@ from caet5.data.dataset import at_preprocessor, tsv_to_dataset_fn, raw_to_tsv
 from caet5.evaluation.metrics import bleu, sentence_similarity, bert_attribute_accuracy_batch, gpt_perplexity_batch_280
 from caet5.evaluation.metrics_utils import setup_parametric_evaluator, load_finetuned_transformer
 
-from caet5.data.utils import TaskRegistry_ll
+from caet5.data.utils import TaskRegistry_ll, MixtureRegistry_ll
 
 FLAGS = flags.FLAGS
 
@@ -148,3 +148,11 @@ TaskRegistry_ll.add(
         token_preprocessor=preprocessors.unsupervised,
         output_features=output_features,
         **task_kwargs)
+
+# Need a mixture because of the error TypeError: <dtype: 'string'> is not a supported TPU infeed type.
+# described here: https://github.com/google-research/text-to-text-transfer-transformer/issues/291
+MixtureRegistry_ll.add(
+        "mixture_%s" % task_name,
+        [task_name],
+        default_rate=1.0
+    )
