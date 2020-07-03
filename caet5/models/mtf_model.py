@@ -39,14 +39,18 @@ class MtfModel_ll(MtfModel):
             batch_size=self.batch_size, ensemble_inputs=self._ensemble_inputs,
             group_by_attribute=self.group_by_attribute)
 
-        if self.group_by_attribute:
-            train_model_ll(self.estimator(vocabulary, init_checkpoint), vocabulary,
-                           self._sequence_length, self.batch_size, dataset_fn,
-                           steps, self._ensemble_inputs, dataset_split=split)
-        else:
-            utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
-                              self._sequence_length, self.batch_size, dataset_fn,
-                              steps, self._ensemble_inputs, dataset_split=split)
+        # When fine-tuning, we first load the gin config of the pre-trained model. Yet here we might set gin parameters
+        # with different values than the gin parameter values from the pre-trained gin config. e.g.
+        # t5.data.preprocessors.unsupervised.preprocessors.
+        with gin.config_scope('caet5'):
+            if self.group_by_attribute:
+                train_model_ll(self.estimator(vocabulary, init_checkpoint), vocabulary,
+                               self._sequence_length, self.batch_size, dataset_fn,
+                               steps, self._ensemble_inputs, dataset_split=split)
+            else:
+                utils.train_model(self.estimator(vocabulary, init_checkpoint), vocabulary,
+                                  self._sequence_length, self.batch_size, dataset_fn,
+                                  steps, self._ensemble_inputs, dataset_split=split)
 
     def eval(self, mixture_or_task_name, checkpoint_steps=None, summary_dir=None,
              split="validation"):

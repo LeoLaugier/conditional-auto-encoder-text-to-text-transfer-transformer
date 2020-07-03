@@ -3,7 +3,7 @@
 include 'dataset.gin'
 import caet5.data.preprocessors
 
-t5.data.preprocessors.unsupervised.preprocessors = [
+caet5/t5.data.preprocessors.unsupervised.preprocessors = [
 @denoise_ll
 ]
 
