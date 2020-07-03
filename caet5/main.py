@@ -11,9 +11,10 @@ from mesh_tensorflow.transformer import transformer, utils
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
 
-from caet5.data.utils import TaskRegistry_ll
+from caet5.data.utils import TaskRegistry_ll, get_mixture_or_task_ll
 from caet5.evaluation.eval_utils import print_random_predictions
 from caet5.models.mtf_model import MtfModel_ll
+from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
 from mesh_tensorflow_caet5.transformer import make_bitransformer_ll
 from mesh_tensorflow_caet5.utils import tpu_estimator_model_fn_ll
 
@@ -166,6 +167,21 @@ def main(_):
     print("A few preprocessed validation examples...")
     for ex in tfds.as_numpy(ds.take(5)):
         print(ex)
+
+    print("unitest")
+    mixture_or_task = get_mixture_or_task_ll("processed_cctk")
+
+    dsbis = mixture_or_task.get_dataset(
+        sequence_length, split="validation", use_cached=False, shuffle=True)
+    
+    output_features = ["inputs", "targets", "attribute", "codeprefixedtargets", "controlcode"]
+    ds2 = pack_or_pad_ll(
+        dsbis, sequence_length, pack=True,
+        feature_keys=tuple(output_features), ensure_eos=True)  # pack = True
+
+    for ex in tfds.as_numpy(ds2.take(15)):
+        print(ex)
+
 
     if FLAGS.use_model_api:
         # Modifying original T5 in CAE-T5
