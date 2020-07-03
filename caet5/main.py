@@ -171,7 +171,7 @@ def main(_):
 
     mixture_or_task_name = "processed_cctk"
     from caet5.models.mesh_transformer import mesh_train_dataset_fn_ll
-    from caet5.data.utils import get_mixture_or_task_ll
+    from caet5.data.utils import get_mixture_or_task_ll, MixtureRegistry_ll
     """
     vocabulary = get_mixture_or_task_ll(
         mixture_or_task_name).get_vocabulary()
@@ -179,16 +179,17 @@ def main(_):
         ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
                                    batch_size=4, ensemble_inputs=1, group_by_attribute=True)
     """
-    from caet5.data.utils import MixtureRegistry_ll
+    from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
+
     MixtureRegistry_ll.add(
         "mixture_processed_cctk",
-        ["processed_cctk"],
+        [mixture_or_task_name],
         default_rate=1.0
     )
 
-    from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
-    mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
-    print(tuple(mixture_or_task.output_features))
+    with gin.config_scope('caet5'):
+        mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
+
     ds2 = pack_or_pad_ll(ds, sequence_length, pack=False,
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
 
