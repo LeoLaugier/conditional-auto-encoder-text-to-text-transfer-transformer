@@ -179,8 +179,15 @@ def main(_):
         ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
                                    batch_size=4, ensemble_inputs=1, group_by_attribute=True)
     """
+    from caet5.data.utils import MixtureRegistry_ll
+    MixtureRegistry_ll.add(
+        "mixture_processed_cctk",
+        ["processed_cctk"],
+        default_rate=1.0
+    )
+
     from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
-    mixture_or_task = get_mixture_or_task_ll(mixture_or_task_name)
+    mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
     print(tuple(mixture_or_task.output_features))
     ds2 = pack_or_pad_ll(ds, sequence_length, pack=False,
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
