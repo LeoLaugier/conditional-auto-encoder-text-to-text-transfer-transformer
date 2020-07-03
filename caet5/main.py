@@ -174,7 +174,8 @@ def main(_):
 
     vocabulary = get_mixture_or_task_ll(
         mixture_or_task_name).get_vocabulary()
-    ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
+    with gin.config_scope('caet5'):
+        ds2 = mesh_train_dataset_fn_ll(mixture_or_task_name, sequence_length, vocabulary,
                                    batch_size=4, ensemble_inputs=1, group_by_attribute=True)
 
     print("A few preprocessed validation examples...")
