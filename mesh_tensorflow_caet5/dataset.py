@@ -33,7 +33,7 @@ def shift_decoder_output_fn(dataset, left_pad_amts=None, feature_keys=None):
 
   def map_shift_decoder_output(x):
     attribute = x["attribute"][0]
-    shifted = None
+    shifted = {k: _shift_decoder_output(k, t, 0) for k, t in x.items()}
     for i in range(len(left_pad_amts)):
         if tf.equal(attribute, i+1):
             shifted = {k: _shift_decoder_output(k, t, left_pad_amts[i]) for k, t in x.items()}
