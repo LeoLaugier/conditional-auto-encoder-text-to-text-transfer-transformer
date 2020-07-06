@@ -13,7 +13,7 @@ from torchtext import data
 from caet5.data.dataset import MyDataset
 
 @gin.configurable
-def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device, batch_size=8, block_size=-1,
+def gpt_perplexity_batch_280(targets, predictions, finetuned_model, tokenizer, device, batch_size=8, block_size=-1,
                              **unused_kwargs):
   eval_dataset = MyDataset(tokenizer=tokenizer, prediction_list=predictions, block_size=block_size)
 
@@ -28,7 +28,7 @@ def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device,
 
   eval_loss = 0.0
   nb_eval_steps = 0
-  ppl_model.eval()
+  finetuned_model.eval()
 
   for batch in eval_dataloader:
     inputs, labels = (batch, batch)
@@ -36,7 +36,7 @@ def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device,
     labels = labels.to(device)
 
     with torch.no_grad():
-      outputs = ppl_model(inputs, labels=labels)
+      outputs = finetuned_model(inputs, labels=labels)
       lm_loss = outputs[0]
       eval_loss += lm_loss.mean().item()
     nb_eval_steps += 1
@@ -46,7 +46,7 @@ def gpt_perplexity_batch_280(targets, predictions, ppl_model, tokenizer, device,
 
   return {"perplexity": perplexity}
 
-def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, batch_size=8, block_size=256,
+def gpt_perplexity_batch_290(targets, predictions, finetuned_model, tokenizer, batch_size=8, block_size=256,
                              **unused_kwargs):
   # Too early, wait for transformers v2.9.0, otherwise:
   # ImportError: cannot import name 'DataCollatorForLanguageModeling'
@@ -55,7 +55,7 @@ def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, batch_s
   data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
   trainer = Trainer(
-    model=ppl_model,
+    model=finetuned_model,
     args=training_args,
     data_collator=data_collator,
     eval_dataset=eval_dataset,
