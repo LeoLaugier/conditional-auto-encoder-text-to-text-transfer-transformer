@@ -69,7 +69,7 @@ def gpt_perplexity_batch_290(targets, predictions, ppl_model, tokenizer, batch_s
   return {"perplexity": perplexity}
 
 
-def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, **unused_kwargs):
+def gpt_perplexity(targets, predictions, finetuned_model, tokenizer, device, **unused_kwargs):
   examples = tokenizer.batch_encode_plus(predictions, add_special_tokens=True,
                                                 max_length=tokenizer.max_len)["input_ids"]
   all_input_ids = [torch.tensor(example, dtype=torch.long) for example in examples]
@@ -83,9 +83,9 @@ def gpt_perplexity(targets, predictions, ppl_model, tokenizer, device, **unused_
   inputs = inputs.to(device)
   labels = labels.to(device)
 
-  ppl_model.eval()
+  finetuned_model.eval()
   with torch.no_grad():
-    outputs = ppl_model(inputs, labels=labels)
+    outputs = finetuned_model(inputs, labels=labels)
     lm_loss = outputs[0]
     eval_loss = lm_loss.mean().item()
 
@@ -107,7 +107,7 @@ def kenlm_perplexity(targets, predictions, ppl_model, **unused_kwargs):
   return {"perplexity": perplexity}
 
 @gin.configurable
-def bert_attribute_accuracy_batch(targets, predictions, classifier_model, tokenizer, device, attributes_origin=None,
+def bert_attribute_accuracy_batch(targets, predictions, finetuned_model, tokenizer, device, attributes_origin=None,
                                   batch_size=32):
   # torchtext dataset
   init_token_idx = tokenizer.cls_token_id
@@ -143,11 +143,11 @@ def bert_attribute_accuracy_batch(targets, predictions, classifier_model, tokeni
 
   epoch_acc = 0
 
-  classifier_model.eval()
+  finetuned_model.eval()
 
   with torch.no_grad():
     for batch in valid_iterator:
-      prediction_labels = torch.round(torch.sigmoid(classifier_model(batch.comment_text)[0].squeeze(1)))
+      prediction_labels = torch.round(torch.sigmoid(finetuned_model(batch.comment_text)[0].squeeze(1)))
       correct = (prediction_labels != batch.attribute_origin).float()
       acc = correct.sum() / len(correct)
       epoch_acc += acc.item()

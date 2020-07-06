@@ -94,7 +94,7 @@ def load_finetuned_transformer(evaluator_name, finetuned_model_local_path, pretr
     except:
         raise RuntimeError('Error(s) in loading state_dict for %s.' % evaluator_name)
 
-    eval_fn_args =[]
+    eval_fn_args = []
     eval_fn_kwargs = dict({"finetuned_model": pretrained_model, "tokenizer": tokenizer, "device": device}, **kwargs)
 
     return eval_fn_args, eval_fn_kwargs
