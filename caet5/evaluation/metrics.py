@@ -2,7 +2,7 @@ import gin
 import math
 import numpy as np
 import t5
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import torch
 from torch.utils.data import SequentialSampler, DataLoader
 from torch.nn.utils.rnn import pad_sequence
