@@ -1,0 +1,3 @@
+MtfModel_ll.sequence_length = {"inputs": 64, "targets": 64,
+                               "attribute": 64, "codeprefixedtargets": 64,
+                               "controlcode": 64}

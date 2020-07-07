@@ -1,0 +1,15 @@
+# Defaults for self-supervised denoising objective.
+
+include 'dataset.gin'
+import caet5.data.preprocessors
+
+caet5/t5.data.preprocessors.unsupervised.preprocessors = [
+@denoise_ll
+]
+
+denoise_ll.noise_density = 0.15
+denoise_ll.noise_mask_fn = @t5.data.preprocessors.iid_noise_mask
+denoise_ll.inputs_fn = @t5.data.preprocessors.noise_token_to_random_token_or_sentinel
+denoise_ll.targets_fn = None
+denoise_ll.attribute_bit = %attribute_bit
+denoise_ll.target_prefix_attributes = %target_prefix_attributes
