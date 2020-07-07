@@ -1,5 +1,3 @@
-Code for CAE-T5
-
 # CAET5: Mitigating toxicity in online conversations using self-supervised transformers
 
 CAET5 serves as code for fine-tuning pre-trained text-to-text transformers from [_Exploring the Limits of Transfer 

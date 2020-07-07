@@ -20,7 +20,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     author='Leo Laugier, Ioannis Pavlopoulos, Jeffrey Sorensen, Lucas Dixon',
     author_email='leo.laugier@telecom-paris.fr',
-    url='https://github.com/LeoLaugier/self_supervised_t5_style_transfer', # TODO
+    url='https://github.com/LeoLaugier/conditional-auto-encoder-text-to-text-transfer-transformer',
     # license='Apache 2.0', # TODO
     packages=setuptools.find_packages(),
     package_data={
