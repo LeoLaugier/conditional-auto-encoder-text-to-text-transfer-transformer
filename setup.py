@@ -21,17 +21,13 @@ setuptools.setup(
     author='Leo Laugier, Ioannis Pavlopoulos, Jeffrey Sorensen, Lucas Dixon',
     author_email='leo.laugier@telecom-paris.fr',
     url='https://github.com/LeoLaugier/conditional-auto-encoder-text-to-text-transfer-transformer',
-    # license='Apache 2.0', # TODO
+    license='Apache 2.0',
     packages=setuptools.find_packages(),
     package_data={
         '': ['*.gin'],
     },
     scripts=[],
     install_requires=[ #TODO Update CAET5 to fit last versions of transformers and t5
-        #"tensorflow",
-        #"tensorflow-text",
-        #"transformers==2.8.0",
-        #"tfds-nightly",
         "google-api-python-client",
         "google-cloud_storage",
         "tensorflow_hub",
@@ -48,7 +44,7 @@ setuptools.setup(
         # 'Development Status :: 4 - Beta', # TODO
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
-        # 'License :: OSI Approved :: Apache Software License', # TODO
+        'License :: OSI Approved :: Apache Software License',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
     ],
     keywords='text nlp nlg machinelearning deeplearning',
