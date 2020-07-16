@@ -229,6 +229,17 @@ def dataset_fn(split, shuffle_files=False):
 
 task_kwargs = {"dataset_fn": dataset_fn}
 
+TaskRegistry_ll.add(
+        task_name,
+        splits=splits,
+        text_preprocessor=[at_preprocessor],
+        sentencepiece_model_path=DEFAULT_SPM_PATH,
+        postprocess_fn=t5.data.postprocessors.lower_text,
+        metric_fns=metric_fns,
+        token_preprocessor=preprocessors.unsupervised,
+        output_features=output_features,
+        **task_kwargs)
+
 MixtureRegistry_ll.add(
         "mixture_%s" % task_name,
         [task_name],
