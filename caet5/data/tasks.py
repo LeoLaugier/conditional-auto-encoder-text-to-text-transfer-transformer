@@ -189,6 +189,7 @@ if "PPL" in FLAGS.metrics:
                                                   load_tokenizer_fn=AutoTokenizer.from_pretrained,
                                                   load_config_fn=AutoConfig.from_pretrained,
                                                   load_pretrained_fn=AutoModelWithLMHead.from_config,
+                                                  map_location=torch.device('cpu'),
                                                   batch_size=8,
                                                   block_size=256))
 
