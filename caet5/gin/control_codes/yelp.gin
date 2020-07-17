@@ -1,3 +1,5 @@
+import caet5.data.preprocessors
+
 target_prefix_attributes = ["negative: ", "positive: "]
 control_codes = ["positive: ", "negative: "]
 

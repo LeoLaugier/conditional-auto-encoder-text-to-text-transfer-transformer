@@ -1,9 +1,7 @@
 import errno
+import functools
 import os
 
-import functools
-
-import gin
 import tensorflow as tf
 import torch
 from apiclient.http import MediaIoBaseDownload
