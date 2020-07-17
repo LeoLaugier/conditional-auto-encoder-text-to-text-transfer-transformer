@@ -1,5 +1,4 @@
 """Attribute transfer tasks."""
-import copy
 import functools
 import os
 
@@ -67,7 +66,7 @@ task_name = "processed_cctk"
 splits_raw = ["train", "dev", "test"]
 splits = ["train", "validation", "test"]
 
-metric_fns_task = copy.deepcopy(metric_fns)
+metric_fns_task = metric_fns.copy()
 
 if "ACC" in FLAGS.metrics:
     load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
@@ -166,7 +165,7 @@ task_name = "yelp"
 splits_raw = ["train", "dev", "test"]
 splits = ["train", "validation", "test"]
 
-metric_fns_task = copy.deepcopy(metric_fns)
+metric_fns_task = metric_fns.copy()
 
 if "ACC" in FLAGS.metrics:
     load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
