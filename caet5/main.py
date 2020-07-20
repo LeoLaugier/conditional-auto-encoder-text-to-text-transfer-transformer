@@ -220,9 +220,9 @@ def main(_):
     def interleave_map_fn(x):
         return tf.cond(tf.equal(x, 0), f1, f2)
 
-    ds3 = tf.data.Dataset.range(attribute_num).interleave(
-        interleave_map_fn, cycle_length=attribute_num,
-        block_length=batch_size * (ensemble_inputs or 1),
+    ds3 = tf.data.Dataset.range(2).interleave(
+        interleave_map_fn, cycle_length=2,
+        block_length=4,
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     print("A few preprocessed validation examples...")
