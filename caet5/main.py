@@ -168,7 +168,10 @@ def main(_):
         print(ex)
 
 
-    """
+
+
+
+
     print("unitests")
 
     mixture_or_task_name = "processed_cctk"
@@ -192,9 +195,12 @@ def main(_):
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
 
     print("A few preprocessed validation examples...")
-    for ex in tfds.as_numpy(ds2.take(5)):
+    for ex in tfds.as_numpy(ds2.take(10)):
         print(ex)
-    """
+
+
+
+
 
 
     if FLAGS.use_model_api:
