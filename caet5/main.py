@@ -180,12 +180,6 @@ def main(_):
 
     from mesh_tensorflow_caet5.dataset import pack_or_pad_ll
 
-    MixtureRegistry_ll.add(
-        "mixture_processed_cctk",
-        [mixture_or_task_name],
-        default_rate=1.0
-    )
-
     mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
 
     with gin.config_scope('caet5'):
