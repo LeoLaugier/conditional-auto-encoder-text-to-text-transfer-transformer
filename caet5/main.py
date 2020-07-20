@@ -183,13 +183,50 @@ def main(_):
     mixture_or_task = get_mixture_or_task_ll("mixture_processed_cctk")
 
     with gin.config_scope('caet5'):
-        dsbis = mixture_or_task.get_dataset(split="validation", sequence_length=sequence_length)
+        dsbis = mixture_or_task.get_dataset(split="train", sequence_length=sequence_length)
 
+    """
     ds2 = pack_or_pad_ll(dsbis, sequence_length, pack=False,
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
+    """
+
+    def filter_attribute_1_fn(x):
+        return tf.equal(x["attribute"][0], 1)
+
+    def filter_attribute_2_fn(x):
+        return tf.equal(x["attribute"][0], 2)
+
+    ds_attribute_1 = dsbis.filter(filter_attribute_1_fn)
+    ds_attribute_2 = dsbis.filter(filter_attribute_2_fn)
+
+    ds2_attribute_1 = pack_or_pad_ll(
+        ds_attribute_1, sequence_length, pack=False,
+        feature_keys=tuple(mixture_or_task.output_features),
+        ensure_eos=True)  # (not straightforward) Adapt packing so that pack=True
+    ds2_attribute_2 = pack_or_pad_ll(
+        ds_attribute_2, sequence_length, pack=False,
+        feature_keys=tuple(mixture_or_task.output_features),
+        ensure_eos=True)  # (not straightforward) Adapt packing so that pack=True
+
+    ds3_attribute_1 = ds2_attribute_1
+    ds3_attribute_2 = ds2_attribute_2
+
+    def f1():
+        return ds3_attribute_1
+
+    def f2():
+        return ds3_attribute_2
+
+    def interleave_map_fn(x):
+        return tf.cond(tf.equal(x, 0), f1, f2)
+
+    ds3 = tf.data.Dataset.range(attribute_num).interleave(
+        interleave_map_fn, cycle_length=attribute_num,
+        block_length=batch_size * (ensemble_inputs or 1),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     print("A few preprocessed validation examples...")
-    for ex in tfds.as_numpy(ds2.take(80)):
+    for ex in tfds.as_numpy(ds3.take(80)):
         print(ex)
 
 
