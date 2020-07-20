@@ -189,7 +189,7 @@ def main(_):
                          feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
 
     print("A few preprocessed validation examples...")
-    for ex in tfds.as_numpy(ds2.take(10)):
+    for ex in tfds.as_numpy(ds2.take(80)):
         print(ex)
 
 
