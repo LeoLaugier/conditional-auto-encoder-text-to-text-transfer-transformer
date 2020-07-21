@@ -23,7 +23,7 @@ def print_random_predictions(mixture_or_task_name, sequence_length, model_dir, n
     prediction_files = tf.io.gfile.glob(
         os.path.join(
             model_dir,
-            "validation_eval/%s_*_predictions" % task_name))
+            "validation_eval/%s_*_predictions" % mixture_or_task_name))
     # Get most recent prediction file by sorting by their step.
     latest_prediction_file = sorted(
         prediction_files, key=_prediction_file_to_ckpt)[-1]
@@ -37,8 +37,8 @@ def print_random_predictions(mixture_or_task_name, sequence_length, model_dir, n
                         pred.strip()))
 
     print("<== Random predictions for %s using checkpoint %s ==>\n" %
-          (task_name,
-          _prediction_file_to_ckpt(latest_prediction_file)))
+          (mixture_or_task_name,
+           _prediction_file_to_ckpt(latest_prediction_file)))
 
     for inp, tgt, pred in random.choices(results, k=10): # k=n ?
       print("Input:", inp)
