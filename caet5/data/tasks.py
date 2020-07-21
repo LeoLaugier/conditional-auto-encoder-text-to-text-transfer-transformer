@@ -185,7 +185,7 @@ if "ACC" in FLAGS.metrics:
                                                        map_location=torch.device('cpu')))
 
 if "PPL" in FLAGS.metrics:
-    metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_ppl_yelp.pt",
+    metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_220000_ppl_yelp.pt",
                                                        load_parametric_model_fn=load_finetuned_transformer,
                                                        pretrained_model_name_or_path="gpt2",
                                                        load_tokenizer_fn=AutoTokenizer.from_pretrained,

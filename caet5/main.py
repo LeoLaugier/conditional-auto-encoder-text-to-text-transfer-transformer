@@ -169,9 +169,7 @@ def main(_):
 
 
 
-
-
-
+    """
     print("unitests")
 
     mixture_or_task_name = "processed_cctk"
@@ -185,10 +183,10 @@ def main(_):
     with gin.config_scope('caet5'):
         dsbis = mixture_or_task.get_dataset(split="train", sequence_length=sequence_length)
 
-    """
-    ds2 = pack_or_pad_ll(dsbis, sequence_length, pack=False,
-                         feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
-    """
+    
+    #ds2 = pack_or_pad_ll(dsbis, sequence_length, pack=False,
+    #                     feature_keys=tuple(mixture_or_task.output_features), ensure_eos=True)
+    
 
     def filter_attribute_1_fn(x):
         return tf.equal(x["attribute"][0], 1)
@@ -228,10 +226,7 @@ def main(_):
     print("A few preprocessed validation examples...")
     for ex in tfds.as_numpy(ds3.take(80)):
         print(ex)
-
-
-
-
+    """
 
 
     if FLAGS.use_model_api:
