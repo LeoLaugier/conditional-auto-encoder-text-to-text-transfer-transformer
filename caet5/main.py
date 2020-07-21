@@ -289,7 +289,7 @@ def main(_):
                 split=FLAGS.eval_split
             )
 
-            print_random_predictions(FLAGS.mixture_or_task, sequence_length, model_dir, n=10)
+            # print_random_predictions("yelp", sequence_length, model_dir, n=10)
 
         elif FLAGS.mode == "predict":
             if FLAGS.predict_batch_size > 0:
