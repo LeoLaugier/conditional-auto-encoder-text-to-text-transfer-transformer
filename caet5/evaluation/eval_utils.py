@@ -23,7 +23,7 @@ def print_random_predictions(mixture_or_task_name, sequence_length, model_dir, n
     prediction_files = tf.io.gfile.glob(
         os.path.join(
             model_dir,
-            "validation_eval/%s_*_predictions" % mixture_or_task_name))
+            "validation_eval/%s_*_predictions" % ds.name))
     # Get most recent prediction file by sorting by their step.
     latest_prediction_file = sorted(
         prediction_files, key=_prediction_file_to_ckpt)[-1]
