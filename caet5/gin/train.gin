@@ -1,7 +1,5 @@
 include 'dataset.gin'
 
-tpu_estimator_model_fn_ll.has_partial_sequences = True
-tpu_estimator_model_fn_ll.remove_partial_sequences = True
 tpu_estimator_model_fn_ll.lambda_ae = 1.0
 tpu_estimator_model_fn_ll.lambda_cycle = 1.0
 tpu_estimator_model_fn_ll.cycle_consistency_loss = True

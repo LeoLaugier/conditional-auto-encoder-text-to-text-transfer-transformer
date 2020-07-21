@@ -13,3 +13,6 @@ pack_or_pad_ll.target_prefix_attributes = %target_prefix_attributes
 pack_or_pad_ll.tokenizer = @get_default_vocabulary()
 
 make_bitransformer_ll.cut_cross_attention = True
+
+tpu_estimator_model_fn_ll.has_partial_sequences = True
+tpu_estimator_model_fn_ll.remove_partial_sequences = True

@@ -139,20 +139,20 @@ class Unitransformer_ll(Unitransformer):
 
         if self.attribute_embedding:
             if "attribute_embedding" in context.shared_params:
-                sty_emb_var = context.shared_params["attribute_embedding"]
+                att_emb_var = context.shared_params["attribute_embedding"]
             else:
-                sty_emb_var = mtf.layers.embedding_weights(
+                att_emb_var = mtf.layers.embedding_weights(
                     mesh, self.attribute_dim, self.model_dim, context.variable_dtype,
                     "attribute_embedding", ensemble_dim=self.ensemble_dim)
 
-            sty_emb = mtf.gather(
-                sty_emb_var, attributes, self.attribute_dim,
+            att_emb = mtf.gather(
+                att_emb_var, attributes, self.attribute_dim,
                 output_shape=x.shape)
             # Addition of x and attribute
             # x *= LAMBDA_ATTRIBUTE * sty_emb #
 
             # Concatenation of x and attribute
-            x_attribute = mtf.concat([x, sty_emb], self.model_dim.name)
+            x_attribute = mtf.concat([x, att_emb], self.model_dim.name)
             x = mtf.layers.dense(
                 x_attribute, self.model_dim, activation=None, variable_dtype=context.variable_dtype,
                 name="comb_x_attribute")
