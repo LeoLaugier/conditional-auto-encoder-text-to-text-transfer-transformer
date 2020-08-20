@@ -1,0 +1,12 @@
+import caet5.data.preprocessors
+
+target_prefix_attributes = ["Dickens: ", "Shakespeare: "]
+control_codes = ["Shakespeare: ", "Dickens: "]
+
+
+at_preprocessor.target_prefix_attributes = %target_prefix_attributes
+at_preprocessor.control_codes = %control_codes
+denoise_ll.target_prefix_attributes = %target_prefix_attributes
+pack_or_pad_ll.target_prefix_attributes = %target_prefix_attributes
+infer_model_ll.control_codes_decode = %target_prefix_attributes
+tpu_estimator_model_fn_ll.control_codes = %control_codes
