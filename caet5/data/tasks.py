@@ -68,32 +68,33 @@ splits = ["train", "validation", "test"]
 
 metric_fns_task = metric_fns.copy()
 
-if "ACC" in FLAGS.metrics:
-    load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
-                                               "bert-base-uncased")
-    load_config_acc_fn = functools.partial(BertConfig.from_pretrained,
-                                           num_labels=1)
+if task_name in FLAGS.mixture_or_task:
+    if "ACC" in FLAGS.metrics:
+        load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
+                                                   "bert-base-uncased")
+        load_config_acc_fn = functools.partial(BertConfig.from_pretrained,
+                                               num_labels=1)
 
-    metric_fns_task.append(setup_acc_parametric_metric(model_architecture="bert",
-                                                       task=task_name,
-                                                       ext="pt",
-                                                       load_parametric_model_fn=load_finetuned_transformer,
-                                                       pretrained_model_name_or_path="bert-base-uncased",
-                                                       load_tokenizer_fn=AutoTokenizer.from_pretrained,
-                                                       load_config_fn=load_config_acc_fn,
-                                                       load_pretrained_fn=load_pretrained_acc_fn,
-                                                       batch_size=32,
-                                                       map_location=torch.device('cpu')))
+        metric_fns_task.append(setup_acc_parametric_metric(model_architecture="bert",
+                                                           task=task_name,
+                                                           ext="pt",
+                                                           load_parametric_model_fn=load_finetuned_transformer,
+                                                           pretrained_model_name_or_path="bert-base-uncased",
+                                                           load_tokenizer_fn=AutoTokenizer.from_pretrained,
+                                                           load_config_fn=load_config_acc_fn,
+                                                           load_pretrained_fn=load_pretrained_acc_fn,
+                                                           batch_size=32,
+                                                           map_location=torch.device('cpu')))
 
-if "PPL" in FLAGS.metrics:
-    metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_ppl_cctk.pt",
-                                                       load_parametric_model_fn=load_finetuned_transformer,
-                                                       pretrained_model_name_or_path="gpt2",
-                                                       load_tokenizer_fn=AutoTokenizer.from_pretrained,
-                                                       load_config_fn=AutoConfig.from_pretrained,
-                                                       load_pretrained_fn=AutoModelWithLMHead.from_config,
-                                                       batch_size=8,
-                                                       block_size=256))
+    if "PPL" in FLAGS.metrics:
+        metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_ppl_cctk.pt",
+                                                           load_parametric_model_fn=load_finetuned_transformer,
+                                                           pretrained_model_name_or_path="gpt2",
+                                                           load_tokenizer_fn=AutoTokenizer.from_pretrained,
+                                                           load_config_fn=AutoConfig.from_pretrained,
+                                                           load_pretrained_fn=AutoModelWithLMHead.from_config,
+                                                           batch_size=8,
+                                                           block_size=256))
 
 output_features = ["inputs", "targets", "attribute", "codeprefixedtargets", "controlcode"]
 
@@ -167,33 +168,34 @@ splits = ["train", "validation", "test"]
 
 metric_fns_task = metric_fns.copy()
 
-if "ACC" in FLAGS.metrics:
-    load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
-                                               "bert-base-uncased")
-    load_config_acc_fn = functools.partial(BertConfig.from_pretrained,
-                                           num_labels=1)
+if task_name in FLAGS.mixture_or_task:
+    if "ACC" in FLAGS.metrics:
+        load_pretrained_acc_fn = functools.partial(BertForSequenceClassification.from_pretrained,
+                                                   "bert-base-uncased")
+        load_config_acc_fn = functools.partial(BertConfig.from_pretrained,
+                                               num_labels=1)
 
-    metric_fns_task.append(setup_acc_parametric_metric(model_architecture="bert",
-                                                       task=task_name,
-                                                       ext="pt",
-                                                       load_parametric_model_fn=load_finetuned_transformer,
-                                                       pretrained_model_name_or_path="bert-base-uncased",
-                                                       load_tokenizer_fn=AutoTokenizer.from_pretrained,
-                                                       load_config_fn=load_config_acc_fn,
-                                                       load_pretrained_fn=load_pretrained_acc_fn,
-                                                       batch_size=32,
-                                                       map_location=torch.device('cpu')))
+        metric_fns_task.append(setup_acc_parametric_metric(model_architecture="bert",
+                                                           task=task_name,
+                                                           ext="pt",
+                                                           load_parametric_model_fn=load_finetuned_transformer,
+                                                           pretrained_model_name_or_path="bert-base-uncased",
+                                                           load_tokenizer_fn=AutoTokenizer.from_pretrained,
+                                                           load_config_fn=load_config_acc_fn,
+                                                           load_pretrained_fn=load_pretrained_acc_fn,
+                                                           batch_size=32,
+                                                           map_location=torch.device('cpu')))
 
-if "PPL" in FLAGS.metrics:
-    metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_ppl_yelp.pt",
-                                                       load_parametric_model_fn=load_finetuned_transformer,
-                                                       pretrained_model_name_or_path="gpt2",
-                                                       load_tokenizer_fn=AutoTokenizer.from_pretrained,
-                                                       load_config_fn=AutoConfig.from_pretrained,
-                                                       load_pretrained_fn=AutoModelWithLMHead.from_config,
-                                                       map_location=torch.device('cpu'),
-                                                       batch_size=8,
-                                                       block_size=256))
+    if "PPL" in FLAGS.metrics:
+        metric_fns_task.append(setup_ppl_parametric_metric(model_filename="gpt2_ppl_yelp.pt",
+                                                           load_parametric_model_fn=load_finetuned_transformer,
+                                                           pretrained_model_name_or_path="gpt2",
+                                                           load_tokenizer_fn=AutoTokenizer.from_pretrained,
+                                                           load_config_fn=AutoConfig.from_pretrained,
+                                                           load_pretrained_fn=AutoModelWithLMHead.from_config,
+                                                           map_location=torch.device('cpu'),
+                                                           batch_size=8,
+                                                           block_size=256))
 
 output_features = ["inputs", "targets", "attribute", "codeprefixedtargets", "controlcode"]
 
