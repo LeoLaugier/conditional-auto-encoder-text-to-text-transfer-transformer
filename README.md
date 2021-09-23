@@ -191,11 +191,27 @@ caet5 --tpu="${TPU_ADDRESS}" \
 
 
 # How to Cite
-This work is currently under double-blind review. We will update this section as soon as possible.
+If you extend or use this work, please cite the [paper][paper] where it was introduced:
 
+```bibtex
+@inproceedings{laugier-etal-2021-civil,
+    title = "Civil Rephrases Of Toxic Texts With Self-Supervised Transformers",
+    author = "Laugier, L{\'e}o  and
+      Pavlopoulos, John  and
+      Sorensen, Jeffrey  and
+      Dixon, Lucas",
+    booktitle = "Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: Main Volume",
+    month = apr,
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.eacl-main.124",
+    pages = "1442--1461",
+    abstract = "Platforms that support online commentary, from social networks to news sites, are increasingly leveraging machine learning to assist their moderation efforts. But this process does not typically provide feedback to the author that would help them contribute according to the community guidelines. This is prohibitively time-consuming for human moderators to do, and computational approaches are still nascent. This work focuses on models that can help suggest rephrasings of toxic comments in a more civil manner. Inspired by recent progress in unpaired sequence-to-sequence tasks, a self-supervised learning model is introduced, called CAE-T5. CAE-T5 employs a pre-trained text-to-text transformer, which is fine tuned with a denoising and cyclic auto-encoder loss. Experimenting with the largest toxicity detection dataset to date (Civil Comments) our model generates sentences that are more fluent and better at preserving the initial content compared to earlier text style transfer systems which we compare with using several scoring systems and human evaluation.",
+}
+```
 
-
-[paper]: https://arxiv.org/abs/1910.10683
+[paper]: https://aclanthology.org/2021.eacl-main.124.pdf
 [t5]: https://github.com/google-research/text-to-text-transfer-transformer
 [t5_data]: https://github.com/google-research/text-to-text-transfer-transformer#t5data
 [t5_evaluation]: https://github.com/google-research/text-to-text-transfer-transformer#t5evaluation
