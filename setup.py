@@ -32,7 +32,7 @@ setuptools.setup(
         "google-cloud_storage",
         "tensorflow_hub",
         "torchtext",
-        "transformers==2.8.0",
+        "transformers==4.30.0",
         "t5==0.5.0",
     ],
     entry_points={
